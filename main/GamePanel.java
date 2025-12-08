@@ -8,6 +8,7 @@ import java.awt.Graphics2D;
 import javax.swing.JPanel;
 
 import entity.Player;
+import tile.TileManager;
 
 // Game Screen
 public class GamePanel extends JPanel implements Runnable{
@@ -19,19 +20,29 @@ public class GamePanel extends JPanel implements Runnable{
     public final int tileSize = originalTileSize * scale; // 48x48 tile
 
     // Spesifikasi Map
-    final int maxScreenCol = 14;
-    final int maxScreenRow = 10;
-    final int screenWidth = tileSize * maxScreenCol; // 672 pixels
-    final int screenHeight = tileSize * maxScreenRow; // 480 pixels
+    public final int maxScreenCol = 14;
+    public final int maxScreenRow = 10;
+    public final int screenWidth = tileSize * maxScreenCol; // 672 pixels
+    public final int screenHeight = tileSize * maxScreenRow; // 480 pixels
 
     // FPS
     int FPS = 60;
 
+    // Tile
+    TileManager tileM = new TileManager(this);
+
+    // Key Handler
     KeyHandler keyH = new KeyHandler();
+
+    // Thread
     Thread gameThread;
 
+    // Collision
+    public CollisionChecker cChecker = new CollisionChecker(this);
+
     //Player
-    Player player = new Player(this, keyH);
+    public Player[] players = new Player[2];
+    public int acivePlayerIndex = 0;
 
     public GamePanel(){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
@@ -39,6 +50,13 @@ public class GamePanel extends JPanel implements Runnable{
         this.setDoubleBuffered(true); 
         this.addKeyListener(keyH);
         this.setFocusable(true);
+
+        players[0] = new Player(this, keyH);
+        players[1] = new Player(this,keyH);
+
+        players[1].x = 386;
+        players[1].y = 239;
+
     }
 
     public void startGameThread(){
@@ -76,13 +94,23 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void update(){
-        player.update();
+        if(keyH.switchPressed == true){
+            acivePlayerIndex = (acivePlayerIndex + 1) % players.length;
+            keyH.switchPressed = false;
+        }
+        players[acivePlayerIndex].update();
     }
 
     public void paintComponent(Graphics g){
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
-        player.draw(g2);
+        
+        tileM.draw(g2);
+
+        for(int i = 0; i < players.length; i++){
+            players[i].draw(g2);
+        }
+
         g2.dispose();
     }
 }

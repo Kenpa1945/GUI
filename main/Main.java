@@ -11,7 +11,7 @@ public class Main {
         window.setResizable(false);
         window.setTitle("NimonsCooked");
 
-        GamePanel gamePanel = new GamePanel();
+         GamePanel gamePanel = new GamePanel();
         window.add(gamePanel);
 
         window.pack();

@@ -1,6 +1,8 @@
 package main;
 
 import entity.Entity;
+import entity.Player;
+import java.awt.Rectangle;
 
 public class CollisionChecker {
     GamePanel gp;
@@ -62,4 +64,44 @@ public class CollisionChecker {
             entity.collisionOn = true;
         }
     }
+
+    public void checkPlayer(Entity entity, Player[] players, int activePlayerIndex) {
+
+    // Goal posisi yang sudah dihitung dari Player.update()
+    int goalX = entity.goalX;
+    int goalY = entity.goalY;
+
+    // Hitung rectangle solid area di goal
+    int entityLeft = goalX + entity.solidArea.x;
+    int entityRight = goalX + entity.solidArea.x + entity.solidArea.width;
+    int entityTop = goalY + entity.solidArea.y;
+    int entityBottom = goalY + entity.solidArea.y + entity.solidArea.height;
+
+    Rectangle entityGoalArea = new Rectangle(
+        entityLeft,
+        entityTop,
+        entity.solidArea.width,
+        entity.solidArea.height
+    );
+
+    // Loop semua pemain lain
+    for(int i = 0; i < players.length; i++){
+        if(i == activePlayerIndex) continue; // Skip diri sendiri
+
+        Player target = players[i];
+
+        Rectangle targetArea = new Rectangle(
+            target.x + target.solidArea.x,
+            target.y + target.solidArea.y,
+            target.solidArea.width,
+            target.solidArea.height
+        );
+
+        if(entityGoalArea.intersects(targetArea)){
+            entity.collisionOn = true;
+            return;
+        }
+    }
+}
+
 }

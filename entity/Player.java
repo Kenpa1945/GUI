@@ -59,6 +59,11 @@ public class Player extends Entity{
     }
 
     public void update(){
+        if (gp.gameState != gp.playState) {
+            // Player tidak boleh bergerak atau menerima input jika bukan playState
+            return;
+        }
+        
         if (!isMoving) {
             // Cek input hanya jika player tidak sedang bergerak
             if(keyH.upPressed == true){

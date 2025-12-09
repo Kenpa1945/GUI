@@ -4,7 +4,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-
+import java.awt.Font;
+import java.text.DecimalFormat; // Tambahkan import ini untuk format waktu
 import javax.swing.JPanel;
 
 import entity.Player;
@@ -27,6 +28,21 @@ public class GamePanel extends JPanel implements Runnable{
 
     // FPS
     int FPS = 60;
+    
+    // Game State
+    public int gameState;
+    public final int titleState = 0; // State baru untuk Main Menu
+    public final int playState = 1;
+    public final int gameOverState = 2;
+    public final int instructionState = 3; // State baru untuk How to Play
+
+    // Menu State
+    public int commandNum = 0; // 0: Start Game, 1: How to Play, 2: Exit
+
+    // Timer
+    private final int GAME_DURATION_SECONDS = 1 * 60; // 3 menit
+    private long startTime;
+    private long remainingTimeMillis;
 
     // Tile
     TileManager tileM = new TileManager(this);
@@ -57,12 +73,23 @@ public class GamePanel extends JPanel implements Runnable{
         players[1].x = 386;
         players[1].y = 239;
 
+        gameState = titleState; 
+        startTime = System.currentTimeMillis(); 
+        remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
     }
 
     public void startGameThread(){
         gameThread = new Thread(this);
         gameThread.start();
     }
+
+    public void drawText(Graphics2D g2, String text, int x, int y, Font font, Color color) {
+        g2.setFont(font);
+        g2.setColor(color);
+        g2.drawString(text, x, y);
+    }
+
+
 
     @Override
     public void run(){
@@ -93,24 +120,228 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
 
-    public void update(){
-        if(keyH.switchPressed == true){
-            acivePlayerIndex = (acivePlayerIndex + 1) % players.length;
-            keyH.switchPressed = false;
+    
+
+    public void updateTitleState() {
+        if(keyH.upPressed){
+            commandNum--;
+            if(commandNum < 0){
+                commandNum = 2; // Loop ke "Exit"
+            }
+            keyH.upPressed = false;
         }
-        players[acivePlayerIndex].update();
+        if(keyH.downPressed){
+            commandNum++;
+            if(commandNum > 2){
+                commandNum = 0; // Loop ke "Start Game"
+            }
+            keyH.downPressed = false;
+        } 
+        
+        if(keyH.enterPressed){
+            if(commandNum == 0){ // Start Game
+                // Reset/setup ulang nilai game sebelum mulai
+                players[0].setDefaultValues(); 
+                players[1].setDefaultValues();
+                players[1].x = 386; // Posisi Blue Player 
+                players[1].y = 239;
+                
+                // Reset Timer
+                startTime = System.currentTimeMillis(); 
+                remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
+
+                gameState = playState;
+            } else if (commandNum == 1){ // How to Play
+                gameState = instructionState;
+            } else if (commandNum == 2){ // Exit
+                System.exit(0);
+            }
+            keyH.enterPressed = false;
+        }
+    }
+
+    public void updateInstructionState() {
+        if(keyH.enterPressed){
+            gameState = titleState;
+            keyH.enterPressed = false;
+        }
+        // Pastikan input W/A/S/D sudah di-reset/diabaikan di KeyHandler saat di menu.
+        // Karena keyReleased akan dipanggil, ini harusnya tidak masalah.
+    }
+
+    public void update(){
+        if(gameState == titleState){
+            updateTitleState();
+        }
+        else if(gameState == playState) {
+            
+            // --- Cek Timer ---
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            remainingTimeMillis = ((long)GAME_DURATION_SECONDS * 1000) - elapsedTime;
+
+            if (remainingTimeMillis <= 0) {
+                remainingTimeMillis = 0; // Pastikan tidak negatif
+                gameState = gameOverState; // Pindah ke state Game Over
+                System.out.println("Time's Up!!!"); // Output konsol untuk testing
+            }
+            // --- End Cek Timer ---
+
+            if(keyH.switchPressed == true){
+                acivePlayerIndex = (acivePlayerIndex + 1) % players.length;
+                keyH.switchPressed = false;
+            }
+            players[acivePlayerIndex].update();
+        } else if (gameState == gameOverState) {
+            // Logika untuk Game Over (misalnya, menunggu input untuk restart)
+        }
+        else if (gameState == instructionState){
+            updateInstructionState();
+        }
+    }
+
+    public int getXforCenteredText(Graphics2D g2, String text) {
+        int length = (int)g2.getFontMetrics().getStringBounds(text, g2).getWidth();
+        int x = screenWidth / 2 - length / 2;
+        return x;
     }
 
     public void paintComponent(Graphics g){
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
         
-        tileM.draw(g2);
+        if (gameState == titleState) {
+            drawTitleScreen(g2);
+        } else if (gameState == playState) {
+            // DRAW TILES
+            tileM.draw(g2);
 
-        for(int i = 0; i < players.length; i++){
-            players[i].draw(g2);
+            // DRAW PLAYERS
+            for(int i = 0; i < players.length; i++){
+                players[i].draw(g2);
+            }
+            
+            // DRAW UI / TIMER (Logika Timer yang sudah ada)
+            long seconds = remainingTimeMillis / 1000;
+            long minutes = seconds / 60;
+            seconds = seconds % 60;
+            
+            DecimalFormat dFormat = new DecimalFormat("00");
+            String timeText = dFormat.format(minutes) + ":" + dFormat.format(seconds);
+
+            drawText(g2, "Time: " + timeText, 10, 20, new Font("Arial", Font.BOLD, 20), Color.WHITE);
+            drawText(g2, "Player Aktif: " + (acivePlayerIndex == 0 ? "Merah" : "Biru"), 10, 45, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
+
+        }
+        // --- DRAW GAME OVER SCREEN ---
+        else if (gameState == gameOverState) {
+            // Lapisan hitam transparan
+            g2.setColor(new Color(0, 0, 0, 150));
+            g2.fillRect(0, 0, screenWidth, screenHeight);
+            
+            // Teks Game Over
+            String endText = "STAGE OVER!";
+            Font endFont = new Font("Arial", Font.BOLD, 60);
+            g2.setFont(endFont);
+            g2.setColor(Color.RED);
+            
+            // Hitung posisi tengah
+            int x = getXforCenteredText(g2, endText);
+            int y = screenHeight / 2;
+            
+            g2.drawString(endText, x, y);
+            
+            // Teks "Time's Up!!!"
+            String reasonText = "TIME'S UP!!!";
+            Font reasonFont = new Font("Arial", Font.PLAIN, 30);
+            g2.setFont(reasonFont);
+            g2.setColor(Color.WHITE);
+            x = getXforCenteredText(g2, reasonText);
+            g2.drawString(reasonText, x, y + 50);
+
+        }
+        else if (gameState == instructionState){
+            drawInstructionScreen(g2);
         }
 
         g2.dispose();
+    }
+
+    public void drawTitleScreen(Graphics2D g2) {
+        
+        g2.setColor(new Color(0, 50, 0)); // Background hijau gelap
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+        
+        // Title Name
+        g2.setFont(new Font("Arial", Font.BOLD, 70));
+        g2.setColor(Color.WHITE);
+        String text = "NimonsCooked";
+        int x = getXforCenteredText(g2, text);
+        int y = tileSize * 2;
+        g2.drawString(text, x, y);
+        
+        // Character Image (Opsional, jika Anda punya logo atau gambar karakter)
+        // 
+        
+        // Menu
+        g2.setFont(new Font("Arial", Font.PLAIN, 32));
+        g2.setColor(Color.YELLOW);
+        
+        // 1. Start Game
+        text = "START GAME";
+        x = getXforCenteredText(g2, text);
+        y += tileSize * 3;
+        g2.drawString(text, x, y);
+        if(commandNum == 0) {
+            g2.drawString(">", x - tileSize, y);
+        }
+        
+        // 2. How to Play
+        text = "HOW TO PLAY";
+        x = getXforCenteredText(g2, text);
+        y += tileSize;
+        g2.drawString(text, x, y);
+        if(commandNum == 1) {
+            g2.drawString(">", x - tileSize, y);
+        }
+        
+        // 3. Exit
+        text = "EXIT";
+        x = getXforCenteredText(g2, text);
+        y += tileSize;
+        g2.drawString(text, x, y);
+        if(commandNum == 2) {
+            g2.drawString(">", x - tileSize, y);
+        }
+    }
+    
+    public void drawInstructionScreen(Graphics2D g2) {
+        g2.setColor(new Color(0, 0, 50)); // Background biru gelap
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+        
+        g2.setFont(new Font("Arial", Font.BOLD, 50));
+        g2.setColor(Color.WHITE);
+        String title = "HOW TO PLAY";
+        int x = getXforCenteredText(g2, title);
+        int y = tileSize * 1;
+        g2.drawString(title, x, y);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 24));
+        g2.setColor(Color.LIGHT_GRAY);
+        
+        int marginX = tileSize;
+        y += tileSize * 1.5;
+        
+        drawText(g2, "Kontrol Pemain:", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "- Gerak: W (Atas), A (Kiri), S (Bawah), D (Kanan)", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "- Switch Player: SPACE", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "- Interaksi: [Tombol Interaksi Anda]", marginX, y, g2.getFont(), g2.getColor());
+        
+        y += tileSize * 2;
+        g2.setColor(Color.YELLOW);
+        drawText(g2, "Tekan ENTER untuk kembali ke Main Menu...", getXforCenteredText(g2, "Tekan ENTER untuk kembali ke Main Menu..."), y, g2.getFont(), g2.getColor());
+
     }
 }

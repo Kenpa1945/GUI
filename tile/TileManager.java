@@ -49,32 +49,32 @@ public class TileManager {
 
             // Assembly Station
             tile[4] = new Tile();
-            tile[4].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wall.png"));
+            tile[4].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/assembly.png"));
             tile[4].collision = true;
 
             // Serving Counter
             tile[5] = new Tile();
-            tile[5].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wall.png"));
+            tile[5].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/serving.png"));
             tile[5].collision = true;
 
             // Washing Station
             tile[6] = new Tile();
-            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/washing.png"));
+            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wash.png"));
             tile[6].collision = true;
 
             // Ingredient Storage
             tile[7] = new Tile();
-            tile[7].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wall.png"));
+            tile[7].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/chest.png"));
             tile[7].collision = true;
 
             // Plate Storage
             tile[8] = new Tile();
-            tile[8].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wall.png"));
+            tile[8].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/plate.png"));
             tile[8].collision = true;
 
             // Trash Station
             tile[9] = new Tile();
-            tile[9].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/wall.png"));
+            tile[9].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/trash.png"));
             tile[9].collision = true;
 
         }catch(IOException e){

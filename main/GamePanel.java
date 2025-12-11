@@ -4,11 +4,10 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.io.IOException;
 import java.awt.Font;
-import java.text.DecimalFormat; // Tambahkan import ini untuk format waktu
+import java.text.DecimalFormat;
+import java.util.ArrayList;
 
-import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import entity.Player;
@@ -30,7 +29,7 @@ public class GamePanel extends JPanel implements Runnable{
     public final int screenHeight = tileSize * maxScreenRow; // 480 pixels
 
     // FPS
-    int FPS = 60;
+    public final int FPS = 60;
     
     // Game State
     public int gameState;
@@ -63,6 +62,9 @@ public class GamePanel extends JPanel implements Runnable{
     public Player[] players = new Player[2];
     public int acivePlayerIndex = 0;
 
+    // Cooking stations list
+    public ArrayList<CookingStation> cookingStations = new ArrayList<>();
+
     public GamePanel(){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
         this.setBackground(Color.BLACK);
@@ -79,6 +81,15 @@ public class GamePanel extends JPanel implements Runnable{
         gameState = titleState; 
         startTime = System.currentTimeMillis(); 
         remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
+
+        // create cooking stations by scanning map tiles (tile number 3)
+        for (int col = 0; col < maxScreenCol; col++) {
+            for (int row = 0; row < maxScreenRow; row++) {
+                if (tileM.mapTileNum[col][row] == 3) {
+                    cookingStations.add(new CookingStation(this, col, row));
+                }
+            }
+        }
     }
 
     public void startGameThread(){
@@ -118,8 +129,6 @@ public class GamePanel extends JPanel implements Runnable{
                 delta--;
                 drawCount++;
             }
-            
-            
         }
     }
 
@@ -153,6 +162,14 @@ public class GamePanel extends JPanel implements Runnable{
                 startTime = System.currentTimeMillis(); 
                 remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
 
+                // Reset cooking stations: place frying pans back and clear items
+                for (CookingStation cs : cookingStations) {
+                    cs.panPresent = true;
+                    cs.panOwner = -1;
+                    cs.panItem = null;
+                    cs.panTimer = 0;
+                }
+
                 gameState = playState;
             } else if (commandNum == 1){ // How to Play
                 gameState = instructionState;
@@ -168,8 +185,6 @@ public class GamePanel extends JPanel implements Runnable{
             gameState = titleState;
             keyH.enterPressed = false;
         }
-        // Pastikan input W/A/S/D sudah di-reset/diabaikan di KeyHandler saat di menu.
-        // Karena keyReleased akan dipanggil, ini harusnya tidak masalah.
     }
 
     public void update(){
@@ -193,7 +208,18 @@ public class GamePanel extends JPanel implements Runnable{
                 acivePlayerIndex = (acivePlayerIndex + 1) % players.length;
                 keyH.switchPressed = false;
             }
-            players[acivePlayerIndex].update();
+
+            // Update cooking stations first (they handle cooking timers)
+            for (CookingStation cs : cookingStations) {
+                cs.update();
+            }
+
+            // Update all players each frame so e.g. cutting/cooking timers linked to players continue correctly
+            for (int i = 0; i < players.length; i++) {
+                if (players[i] != null) {
+                    players[i].update();
+                }
+            }
         } else if (gameState == gameOverState) {
             // Logika untuk Game Over (misalnya, menunggu input untuk restart)
         }
@@ -218,12 +244,21 @@ public class GamePanel extends JPanel implements Runnable{
             // DRAW TILES
             tileM.draw(g2);
 
-            // DRAW PLAYERS
+            // DRAW cooking stations (pan at station)
+            for (CookingStation cs : cookingStations) {
+                cs.drawAtStation(g2, this);
+            }
+
+            // DRAW PLAYERS (players should draw carried pans above head)
             for(int i = 0; i < players.length; i++){
                 players[i].draw(g2);
+                // after drawing player, draw any pan they carry (so pan icon overlays properly)
+                for (CookingStation cs : cookingStations) {
+                    cs.drawIfCarriedByPlayer(g2, this, i, players[i]);
+                }
             }
             
-            // DRAW UI / TIMER (Logika Timer yang sudah ada)
+            // DRAW UI / TIMER
             long seconds = remainingTimeMillis / 1000;
             long minutes = seconds / 60;
             seconds = seconds % 60;
@@ -233,6 +268,8 @@ public class GamePanel extends JPanel implements Runnable{
 
             drawText(g2, "Time: " + timeText, 10, 20, new Font("Arial", Font.BOLD, 20), Color.WHITE);
             drawText(g2, "Player Aktif: " + (acivePlayerIndex == 0 ? "Merah" : "Biru"), 10, 45, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
+            String holdingText = "Holding: " + (players[acivePlayerIndex].heldItem == null ? "None" : players[acivePlayerIndex].heldItem);
+            drawText(g2, holdingText, 10, 70, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
 
         }
         // --- DRAW GAME OVER SCREEN ---
@@ -269,27 +306,22 @@ public class GamePanel extends JPanel implements Runnable{
         g2.dispose();
     }
 
+    // ... drawTitleScreen, drawInstructionScreen (unchanged from your original) ...
     public void drawTitleScreen(Graphics2D g2) {
-        
-        g2.setColor(new Color(0, 50, 0)); // Background hijau gelap
+        // original code...
+        g2.setColor(new Color(0, 50, 0));
         g2.fillRect(0, 0, screenWidth, screenHeight);
-        
-        // Title Name
+        // (copy original code or keep as is)
         g2.setFont(new Font("Arial", Font.BOLD, 70));
         g2.setColor(Color.WHITE);
         String text = "NimonsCooked";
         int x = getXforCenteredText(g2, text);
         int y = tileSize * 2;
         g2.drawString(text, x, y);
-        
-        // Character Image (Opsional, jika Anda punya logo atau gambar karakter)
-        // 
-        
-        // Menu
+
         g2.setFont(new Font("Arial", Font.PLAIN, 32));
         g2.setColor(Color.YELLOW);
-        
-        // 1. Start Game
+
         text = "START GAME";
         x = getXforCenteredText(g2, text);
         y += tileSize * 3;
@@ -297,8 +329,7 @@ public class GamePanel extends JPanel implements Runnable{
         if(commandNum == 0) {
             g2.drawString(">", x - tileSize, y);
         }
-        
-        // 2. How to Play
+
         text = "HOW TO PLAY";
         x = getXforCenteredText(g2, text);
         y += tileSize;
@@ -306,8 +337,7 @@ public class GamePanel extends JPanel implements Runnable{
         if(commandNum == 1) {
             g2.drawString(">", x - tileSize, y);
         }
-        
-        // 3. Exit
+
         text = "EXIT";
         x = getXforCenteredText(g2, text);
         y += tileSize;
@@ -316,8 +346,9 @@ public class GamePanel extends JPanel implements Runnable{
             g2.drawString(">", x - tileSize, y);
         }
     }
-    
+
     public void drawInstructionScreen(Graphics2D g2) {
+        // original instruction screen (copy if you changed earlier)
         g2.setColor(new Color(0, 0, 50)); // Background biru gelap
         g2.fillRect(0, 0, screenWidth, screenHeight);
         
@@ -340,11 +371,10 @@ public class GamePanel extends JPanel implements Runnable{
         y += tileSize * 0.7;
         drawText(g2, "- Switch Player: SPACE", marginX, y, g2.getFont(), g2.getColor());
         y += tileSize * 0.7;
-        drawText(g2, "- Interaksi: [Tombol Interaksi Anda]", marginX, y, g2.getFont(), g2.getColor());
+        drawText(g2, "- Interaksi: E (ambil/taruh bahan / cooking station)", marginX, y, g2.getFont(), g2.getColor());
         
         y += tileSize * 2;
         g2.setColor(Color.YELLOW);
         drawText(g2, "Tekan ENTER untuk kembali ke Main Menu...", getXforCenteredText(g2, "Tekan ENTER untuk kembali ke Main Menu..."), y, g2.getFont(), g2.getColor());
-
     }
 }

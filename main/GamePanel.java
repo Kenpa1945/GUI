@@ -55,6 +55,10 @@ public class GamePanel extends JPanel implements Runnable{
     // Thread
     Thread gameThread;
 
+    // Plate and Assembly
+    public java.util.ArrayList<PlateStorage> plateStorages = new java.util.ArrayList<>();
+    public java.util.ArrayList<AssemblyStation> assemblyStations = new java.util.ArrayList<>();
+
     // Collision
     public CollisionChecker cChecker = new CollisionChecker(this);
 
@@ -85,8 +89,15 @@ public class GamePanel extends JPanel implements Runnable{
         // create cooking stations by scanning map tiles (tile number 3)
         for (int col = 0; col < maxScreenCol; col++) {
             for (int row = 0; row < maxScreenRow; row++) {
-                if (tileM.mapTileNum[col][row] == 3) {
+                int t = tileM.mapTileNum[col][row];
+                if (t == 3) {
                     cookingStations.add(new CookingStation(this, col, row));
+                }
+                else if (t == 4){
+                    assemblyStations.add(new AssemblyStation(this, col, row));
+                }
+                else if (t == 8){
+                    plateStorages.add(new PlateStorage(this, col, row, 5)); // default 5 plates
                 }
             }
         }
@@ -249,6 +260,12 @@ public class GamePanel extends JPanel implements Runnable{
                 cs.drawAtStation(g2, this);
             }
 
+            // DRAW plate storages
+            for (PlateStorage ps : plateStorages) ps.draw(g2, this);
+
+            // DRAW assembly stations
+            for (AssemblyStation a : assemblyStations) a.draw(g2, this);
+
             // DRAW PLAYERS (players should draw carried pans above head)
             for(int i = 0; i < players.length; i++){
                 players[i].draw(g2);
@@ -256,6 +273,9 @@ public class GamePanel extends JPanel implements Runnable{
                 for (CookingStation cs : cookingStations) {
                     cs.drawIfCarriedByPlayer(g2, this, i, players[i]);
                 }
+
+                for (AssemblyStation a : assemblyStations) a.draw(g2, this);
+                for (PlateStorage ps : plateStorages) ps.draw(g2, this);
             }
             
             // DRAW UI / TIMER

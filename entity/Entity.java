@@ -14,4 +14,11 @@ public class Entity {
     public int goalX, goalY;
     public int spriteCounter = 0;
     public int spriteNum = 1;
+
+    // --- Added for interaction/holding item ---
+    public String heldItem = null; // "bun","meat","cheese","lettuce","tomato" or null
+    public BufferedImage heldItemImage = null;
+    public boolean isInteracting = false; // sedang mengambil bahan
+    public int interactCounter = 0;
+    public int INTERACT_DURATION = 12; // frames (at 60fps ~ 0.2s)
 }

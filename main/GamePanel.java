@@ -4,8 +4,11 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.io.IOException;
 import java.awt.Font;
 import java.text.DecimalFormat; // Tambahkan import ini untuk format waktu
+
+import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 import entity.Player;
@@ -45,7 +48,7 @@ public class GamePanel extends JPanel implements Runnable{
     private long remainingTimeMillis;
 
     // Tile
-    TileManager tileM = new TileManager(this);
+    public TileManager tileM = new TileManager(this);
 
     // Key Handler
     KeyHandler keyH = new KeyHandler();

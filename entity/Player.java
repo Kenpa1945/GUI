@@ -17,6 +17,13 @@ public class Player extends Entity{
     KeyHandler keyH; 
     String color;
 
+    // Ingredient images (preload)
+    BufferedImage imgBun, imgMeat, imgCheese, imgLettuce, imgTomato;
+
+    // temporary pending item while interacting
+    private String pendingItem = null;
+    private BufferedImage pendingItemImage = null;
+
     public Player(GamePanel gp, KeyHandler keyH, String color){
         this.gp = gp;
         this.keyH = keyH;
@@ -30,6 +37,7 @@ public class Player extends Entity{
 
         setDefaultValues();
         getPlayerImage();
+        loadIngredientImages();
     }
 
     public void setDefaultValues(){
@@ -38,6 +46,12 @@ public class Player extends Entity{
         y = 95;
         speed = 1;
         direction = "down";
+
+        // reset holding/interact
+        heldItem = null;
+        heldItemImage = null;
+        isInteracting = false;
+        interactCounter = 0;
     }
 
     public void getPlayerImage(){
@@ -58,12 +72,68 @@ public class Player extends Entity{
         }
     }
 
+    private void loadIngredientImages(){
+        try{
+            imgBun = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/bun.png"));
+            imgMeat = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/meat.png"));
+            imgCheese = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/cheese.png"));
+            imgLettuce = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/lettuce.png"));
+            imgTomato = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/tomato.png"));
+        }catch(IOException e){
+            // Jika resource tidak ditemukan, print stack trace tapi jangan crash program.
+            e.printStackTrace();
+        }
+    }
+
     public void update(){
         if (gp.gameState != gp.playState) {
             // Player tidak boleh bergerak atau menerima input jika bukan playState
             return;
         }
-        
+
+        // Jika sedang berinteraksi (mengambil bahan), blok input lain sampai selesai
+        if (isInteracting) {
+            interactCounter++;
+            if (interactCounter >= INTERACT_DURATION) {
+                // selesai mengambil -> set held item
+                this.heldItem = pendingItem;
+                this.heldItemImage = pendingItemImage;
+
+                // reset pending & interaction
+                pendingItem = null;
+                pendingItemImage = null;
+                isInteracting = false;
+                interactCounter = 0;
+            }
+            // selama interact, tidak memproses input bergerak
+            return;
+        }
+
+        // Interaksi: tekan E
+        if (keyH.ePressed) {
+            // hanya mulai interaksi jika player saat ini tidak membawa barang
+            if (this.heldItem == null) {
+                // cek apakah ada storage di tile saat ini atau tile tetangga (adjacent)
+                int storageTileNum = getAdjacentStorageTile();
+                if (storageTileNum != -1) {
+                    // mulai proses mengambil
+                    pendingItem = tileNumToItemName(storageTileNum);
+                    pendingItemImage = tileNumToImage(storageTileNum);
+                    if (pendingItem != null && pendingItemImage != null) {
+                        isInteracting = true;
+                        interactCounter = 0;
+                        // cegah multi-trigger (tahan 1 kali tekan)
+                        keyH.ePressed = false;
+                        return;
+                    }
+                }
+            } else {
+                // sudah membawa item -> tidak bisa mengambil lain
+                // optional: Anda bisa menambahkan pesan, suara, atau flash
+                keyH.ePressed = false;
+            }
+        }
+
         if (!isMoving) {
             // Cek input hanya jika player tidak sedang bergerak
             if(keyH.upPressed == true){
@@ -101,20 +171,18 @@ public class Player extends Entity{
                 spriteCounter = 0;
             }
         }
-        
+
         // === Bagian 2: Melakukan Pergerakan ke Tujuan ===
         if (isMoving) {
-            
+
             // Cek Tabrakan di tile target SEBELUM bergerak
             collisionOn = false;
             gp.cChecker.checkTile(this); // Asumsi checkTile() diperbarui untuk mengecek goalX/goalY
-            // CATATAN: Karena checkTile yang sebelumnya Anda miliki hanya melihat KeyHandler, 
-            // Anda perlu memastikan CollisionChecker membandingkan goalX/goalY dengan tile.
             gp.cChecker.checkPlayer(this, gp.players, gp.acivePlayerIndex);
-            
+
             // Jika TIDAK ada tabrakan, lakukan pergerakan
             if (collisionOn == false) {
-                
+
                 // Pergerakan satu langkah (speed) menuju goal
                 switch (direction) {
                     case "up":
@@ -153,29 +221,62 @@ public class Player extends Entity{
             } else {
                 // Jika ada tabrakan, batalkan pergerakan dan reset status
                 isMoving = false; 
-                switch (direction) {
-                    case "up":
-                        direction = "up";
-                        break;
-                    case "down":
-                        direction = "down";
-                        break;
-                    case "left":
-                        direction = "left";
-                        break;
-                    case "right":
-                        direction = "right";
-                        break;
-                // TIDAK perlu mengubah x/y karena tabrakan mencegah inisiasi pergerakan
-                }
+                // tidak mengubah x/y karena tidak memulai pergerakan
             }
         }
     }
 
-    public void draw(Graphics2D g2){
-        //g2.setColor(Color.black);
-        //g2.fillRect(x, y, gp.tileSize, gp.tileSize);
+    // Mengembalikan nomor tile storage adjacent (player tile atau tetangga atas/bawah/kiri/kanan), -1 jika tidak ada
+    private int getAdjacentStorageTile() {
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
 
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
+
+        // Cek tile center
+        if (isStorageTile(col, row)) return gp.tileM.mapTileNum[col][row];
+
+        // atas
+        if (row - 1 >= 0 && isStorageTile(col, row - 1)) return gp.tileM.mapTileNum[col][row - 1];
+        // bawah
+        if (row + 1 < gp.maxScreenRow && isStorageTile(col, row + 1)) return gp.tileM.mapTileNum[col][row + 1];
+        // kiri
+        if (col - 1 >= 0 && isStorageTile(col - 1, row)) return gp.tileM.mapTileNum[col - 1][row];
+        // kanan
+        if (col + 1 < gp.maxScreenCol && isStorageTile(col + 1, row)) return gp.tileM.mapTileNum[col + 1][row];
+
+        return -1;
+    }
+
+    private boolean isStorageTile(int col, int row) {
+        int t = gp.tileM.mapTileNum[col][row];
+        return t == 7 || t == 10 || t == 11 || t == 12 || t == 13;
+    }
+
+    private String tileNumToItemName(int tileNum) {
+        switch (tileNum) {
+            case 7: return "bun";
+            case 10: return "meat";
+            case 11: return "cheese";
+            case 12: return "lettuce";
+            case 13: return "tomato";
+            default: return null;
+        }
+    }
+
+    private BufferedImage tileNumToImage(int tileNum) {
+        switch (tileNum) {
+            case 7: return imgBun;
+            case 10: return imgMeat;
+            case 11: return imgCheese;
+            case 12: return imgLettuce;
+            case 13: return imgTomato;
+            default: return null;
+        }
+    }
+
+    public void draw(Graphics2D g2){
         BufferedImage image = null;
 
         switch(direction){
@@ -214,5 +315,30 @@ public class Player extends Entity{
         }
 
         g2.drawImage(image, x, y, gp.tileSize, gp.tileSize, null);
+
+        // Gambar held item di atas kepala pemain (jika ada)
+        if (heldItemImage != null) {
+            int iconW = gp.tileSize / 2;
+            int iconH = gp.tileSize / 2;
+            int iconX = x + (gp.tileSize - iconW) / 2;
+            int iconY = y - iconH - 4; // sedikit jarak di atas kepala
+            g2.drawImage(heldItemImage, iconX, iconY, iconW, iconH, null);
+        }
+
+        // Jika sedang berinteraksi, gambar indikator kecil (mis. kotak progress sederhana)
+        if (isInteracting) {
+            // progress ratio
+            double ratio = (double)interactCounter / (double)INTERACT_DURATION;
+            int barW = gp.tileSize / 2;
+            int barH = 6;
+            int bx = x + (gp.tileSize - barW) / 2;
+            int by = y - gp.tileSize / 2 - barH - 8;
+            g2.setColor(Color.DARK_GRAY);
+            g2.fillRect(bx, by, barW, barH);
+            g2.setColor(Color.GREEN);
+            g2.fillRect(bx, by, (int)(barW * ratio), barH);
+            g2.setColor(Color.WHITE);
+            g2.drawRect(bx, by, barW, barH);
+        }
     }
 }

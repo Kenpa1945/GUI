@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+
 import javax.imageio.ImageIO;
 import main.GamePanel;
 
@@ -18,7 +19,7 @@ public class TileManager {
 
         this.gp = gp;
 
-        tile = new Tile[15];
+        tile = new Tile[20];
         mapTileNum = new int[gp.maxScreenCol][gp.maxScreenRow];
 
         getTileImage();
@@ -63,9 +64,31 @@ public class TileManager {
             tile[6].collision = true;
 
             // Ingredient Storage
+
+            // bun storage (Tile 7)
             tile[7] = new Tile();
-            tile[7].image = ImageIO.read(getClass().getResourceAsStream("/res/tiles/chest.png"));
+            tile[7].image = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/bun_storage.png"));
             tile[7].collision = true;
+
+            // meat storage (Tile 10)
+            tile[10] = new Tile();
+            tile[10].image = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/meat_storage.png"));
+            tile[10].collision = true;
+
+            // cheese storage (Tile 11)
+            tile[11] = new Tile();
+            tile[11].image = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/cheese_storage.png"));
+            tile[11].collision = true;
+
+            // lettuce storage (Tile 12)
+            tile[12] = new Tile();
+            tile[12].image = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/lettuce_storage.png"));
+            tile[12].collision = true;
+
+            // tomato storage (Tile 13)
+            tile[13] = new Tile();
+            tile[13].image = ImageIO.read(getClass().getResourceAsStream("/res/ingredient/tomato_storage.png"));
+            tile[13].collision = true;
 
             // Plate Storage
             tile[8] = new Tile();

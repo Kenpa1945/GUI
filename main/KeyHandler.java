@@ -3,12 +3,12 @@ package main;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 
-
 public class KeyHandler implements KeyListener{
 
-    public boolean upPressed, leftPressed, 
+    public boolean upPressed, leftPressed,
                    rightPressed, downPressed, switchPressed, enterPressed;
-    
+    public boolean ePressed = false; // <-- tombol E untuk interact
+
     @Override
     public void keyTyped(KeyEvent e){
     } 
@@ -36,6 +36,9 @@ public class KeyHandler implements KeyListener{
         if(code == KeyEvent.VK_ENTER){ // Tambahkan input ENTER
             enterPressed = true;
         }
+        if(code == KeyEvent.VK_E){ // Tambahkan tombol E
+            ePressed = true;
+        }
 
     }
 
@@ -61,6 +64,9 @@ public class KeyHandler implements KeyListener{
         }
         if(code == KeyEvent.VK_ENTER){ // Tambahkan input ENTER
             enterPressed = false;
+        }
+        if(code == KeyEvent.VK_E){
+            ePressed = false;
         }
     }
 }

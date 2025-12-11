@@ -41,20 +41,24 @@ public class OrderManager {
 
     public void update(long deltaMillis) {
         if (activeOrders.isEmpty()) return;
-        // update all orders
-        List<Order> expired = new ArrayList<>();
-        for (Order o : activeOrders) {
-            o.update(deltaMillis);
-            if (o.remainingMillis <= 0) expired.add(o);
-        }
-        // handle expired (penalty, remove, spawn new)
-        for (Order e : expired) {
-            gp.score += e.penalty; // apply penalty
-            activeOrders.remove(e);
-            // spawn new only if game still running
-            if (gp.remainingTimeMillis > 0) spawnRandomOrder();
+    
+        // HANYA update order pertama (index 0). Order berikutnya menunggu.
+        Order front = activeOrders.get(0);
+        front.update(deltaMillis);
+    
+        // Jika order pertama expired -> beri penalti dan remove, lalu spawn pengganti jika game masih berjalan
+        if (front.remainingMillis <= 0) {
+            // apply penalty for expired order
+            int penaltyAmount = 50;
+            gp.score -= penaltyAmount;
+            gp.ordersFailed++;            // catat statistik
+            activeOrders.remove(0);       // ambil next jadi index 0
+            if (gp.remainingTimeMillis > 0) {
+                spawnRandomOrder();
+            }
         }
     }
+    
 
     /**
      * Try match a plate contents to an active order.
@@ -75,7 +79,7 @@ public class OrderManager {
         return null;
     }
 
-    private boolean multisetEquals(List<String> a, List<String> b) {
+    public boolean multisetEquals(List<String> a, List<String> b) {
         if (a.size() != b.size()) return false;
         List<String> aa = new ArrayList<>(a);
         List<String> bb = new ArrayList<>(b);
@@ -99,6 +103,26 @@ public class OrderManager {
         // increment failed counter on GamePanel
         gp.ordersFailed++;
         activeOrders.remove(o);
+        if (gp.remainingTimeMillis > 0) spawnRandomOrder();
+    }
+
+    public void completeOrderAtIndex(int idx) {
+        if (idx < 0 || idx >= activeOrders.size()) return;
+        Order o = activeOrders.get(idx);
+        gp.score += o.reward;
+        gp.ordersCompleted++;
+        activeOrders.remove(idx);
+        if (gp.remainingTimeMillis > 0) spawnRandomOrder();
+    }
+
+    public void failOrderAtIndex(int idx) {
+        if (idx < 0 || idx >= activeOrders.size()) return;
+        Order o = activeOrders.get(idx);
+        // apply fixed penalty (50) as agreed — or use o.penalty if you prefer positive values there
+        int penaltyAmount = 50;
+        gp.score -= penaltyAmount;
+        gp.ordersFailed++;
+        activeOrders.remove(idx);
         if (gp.remainingTimeMillis > 0) spawnRandomOrder();
     }
     

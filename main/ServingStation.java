@@ -1,6 +1,9 @@
 package main;
 
 import java.awt.Graphics2D;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import entity.Player;
 
@@ -32,34 +35,47 @@ public class ServingStation {
             // nothing to serve
             return false;
         }
+    
         // get plate contents (copy)
         java.util.List<String> contents = new java.util.ArrayList<>(player.plateStack);
-
-        // try match
-        Order matched = gp.orderManager.matchPlateContents(contents);
-        if (matched != null) {
-            // success
-            gp.orderManager.completeOrder(matched);
-            // schedule dirty plate to be added after 10 seconds
-            gp.plateStorages.get(0).scheduleDirtyPlate(10); // place into the first PlateStorage (we will treat plate storage as a stack; we'll add helper to set top)
-            // remove player's plate
+    
+        // find earliest matching order index
+        int matchedIndex = -1;
+        for (int i = 0; i < gp.orderManager.activeOrders.size(); i++) {
+            Order o = gp.orderManager.activeOrders.get(i);
+            if (gp.orderManager.multisetEquals(o.requiredItems, contents)) {
+                matchedIndex = i;
+                break; // earliest match
+            }
+        }
+    
+        if (matchedIndex != -1) {
+            // success: complete that order by index
+            gp.orderManager.completeOrderAtIndex(matchedIndex);
+    
+            // schedule dirty plate to nearest plate storage (I use index 0; change if you want nearest)
+            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).scheduleDirtyPlate(10);
+    
+            // consume player's plate
             player.plateStack.clear();
             player.heldItem = null;
             player.heldItemImage = null;
             return true;
         } else {
-             // wrong dish: apply penalty by failing the earliest active order if exists
+            // wrong dish: apply penalty to the front-most active order (index 0) OR generic penalty
             if (!gp.orderManager.activeOrders.isEmpty()) {
-                Order earliest = gp.orderManager.activeOrders.get(0);
-                gp.orderManager.failOrder(earliest); // this will add penalty and increment ordersFailed
+                // fail the earliest order (index 0)
+                gp.orderManager.failOrderAtIndex(0);
             } else {
-                // fallback penalty if no orders in list
+                // no active orders, apply generic penalty
                 gp.score -= 50;
                 gp.ordersFailed++;
             }
+    
             // schedule dirty plate
-            gp.plateStorages.get(0).scheduleDirtyPlate(10);
-            // remove player's plate
+            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).scheduleDirtyPlate(10);
+    
+            // consume player's plate
             player.plateStack.clear();
             player.heldItem = null;
             player.heldItemImage = null;

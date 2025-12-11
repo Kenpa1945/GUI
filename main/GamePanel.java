@@ -42,7 +42,7 @@ public class GamePanel extends JPanel implements Runnable{
     public int commandNum = 0; // 0: Start Game, 1: How to Play, 2: Exit
 
     // Timer
-    private final int GAME_DURATION_SECONDS = 3 * 60; // 3 menit
+    private final int GAME_DURATION_SECONDS = 1 * 60; // 3 menit
     private long startTime;
     public long remainingTimeMillis;
     public long lastUpdateTime;
@@ -469,11 +469,18 @@ public class GamePanel extends JPanel implements Runnable{
         int drawn = 0;
         for (int i = 0; i < orderManager.activeOrders.size() && drawn < 3; i++) {
             Order o = orderManager.activeOrders.get(i);
-            String text = "[" + o.position + "] " + o.recipeName + " (" + o.getRemainingSeconds() + "s)";
+            String timePart;
+            if (i == 0) {
+                timePart = " (" + o.getRemainingSeconds() + "s)";
+            } else {
+                timePart = " (waiting)";
+            }
+            String text = "[" + o.position + "] " + o.recipeName + timePart;
             g2.drawString(text, startX, startY - (drawn * gap));
             drawn++;
         }
     }
+    
     
     
 }

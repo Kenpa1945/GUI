@@ -14,6 +14,8 @@ import main.GamePanel;
 import main.KeyHandler;
 import main.CookingStation;
 import main.PlateStorage;
+import main.ServingStation;
+import main.TrashStation;
 import main.AssemblyStation;
 
 public class Player extends Entity{
@@ -169,7 +171,32 @@ public class Player extends Entity{
                     }
                 }
             }
+
+            // --- SERVING STATION (prioritas tinggi) ---
+            int svIndex = getAdjacentServingStationIndex();
+            if (svIndex != -1) {
+                ServingStation sv = gp.servingStations.get(svIndex);
+                boolean acted = sv.interact(this);
+            if (acted) {
+                keyH.ePressed = false;
+                return; // consumed
+                }
+            }
+
             
+
+            // 0) Trash station interaction (highest priority)
+            int tsIndex = getAdjacentTrashStationIndex();
+            if (tsIndex != -1) {
+                TrashStation ts = gp.trashStations.get(tsIndex);
+                boolean acted = ts.interact(this);
+                if (acted) {
+                    keyH.ePressed = false;
+                    return; // consume the input and stop other interactions for this frame
+                }
+            }           
+
+
             // 1) PlateStorage
             int psIndex = getAdjacentPlateStorageIndex();
             if (psIndex != -1) {
@@ -496,4 +523,37 @@ private boolean tryFetchCookedMeatToPlateNearby() {
             default: return null;
         }
     }
+
+    private int getAdjacentTrashStationIndex() {
+    int centerX = x + solidArea.x + solidArea.width/2;
+    int centerY = y + solidArea.y + solidArea.height/2;
+    int col = centerX / gp.tileSize;
+    int row = centerY / gp.tileSize;
+    for (int i = 0; i < gp.trashStations.size(); i++) {
+        TrashStation ts = gp.trashStations.get(i);
+        if (ts.col == col && ts.row == row) return i;
+        if (ts.col == col && ts.row == row - 1) return i;
+        if (ts.col == col && ts.row == row + 1) return i;
+        if (ts.col == col - 1 && ts.row == row) return i;
+        if (ts.col == col + 1 && ts.row == row) return i;
+        }
+        return -1;
+    }
+
+    private int getAdjacentServingStationIndex() {
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
+        for (int i=0;i<gp.servingStations.size();i++){
+            ServingStation s = gp.servingStations.get(i);
+            if (s.col == col && s.row == row) return i;
+            if (s.col == col && s.row == row-1) return i;
+            if (s.col == col && s.row == row+1) return i;
+            if (s.col == col-1 && s.row == row) return i;
+            if (s.col == col+1 && s.row == row) return i;
+        }
+        return -1;
+    }    
+
 }

@@ -42,9 +42,11 @@ public class GamePanel extends JPanel implements Runnable{
     public int commandNum = 0; // 0: Start Game, 1: How to Play, 2: Exit
 
     // Timer
-    private final int GAME_DURATION_SECONDS = 1 * 60; // 3 menit
+    private final int GAME_DURATION_SECONDS = 3 * 60; // 3 menit
     private long startTime;
-    private long remainingTimeMillis;
+    public long remainingTimeMillis;
+    public long lastUpdateTime;
+
 
     // Tile
     public TileManager tileM = new TileManager(this);
@@ -55,9 +57,19 @@ public class GamePanel extends JPanel implements Runnable{
     // Thread
     Thread gameThread;
 
-    // Plate and Assembly
+    // Order
+    public OrderManager orderManager;
+    public java.util.ArrayList<ServingStation> servingStations = new java.util.ArrayList<>();
+    public int score = 0; // total score
+    public int ordersCompleted = 0;
+    public int ordersFailed = 0;
+
+
+    // Plate and Assembly and Trash
     public java.util.ArrayList<PlateStorage> plateStorages = new java.util.ArrayList<>();
     public java.util.ArrayList<AssemblyStation> assemblyStations = new java.util.ArrayList<>();
+    public java.util.ArrayList<TrashStation> trashStations = new java.util.ArrayList<>();
+
 
     // Collision
     public CollisionChecker cChecker = new CollisionChecker(this);
@@ -84,6 +96,7 @@ public class GamePanel extends JPanel implements Runnable{
 
         gameState = titleState; 
         startTime = System.currentTimeMillis(); 
+        lastUpdateTime = System.currentTimeMillis();
         remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
 
         // create cooking stations by scanning map tiles (tile number 3)
@@ -99,8 +112,17 @@ public class GamePanel extends JPanel implements Runnable{
                 else if (t == 8){
                     plateStorages.add(new PlateStorage(this, col, row, 5)); // default 5 plates
                 }
+                else if (t == 9){
+                    trashStations.add(new TrashStation(this, col, row));
+                }
+                else if (t == 5){
+                    servingStations.add(new ServingStation(this, col, row));
+                }
             }
         }
+        // Order manager
+        orderManager = new OrderManager(this);
+        orderManager.trySpawnInitial();
     }
 
     public void startGameThread(){
@@ -199,6 +221,19 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void update(){
+        // === DELTA TIME CALCULATION ===
+        long now = System.currentTimeMillis();
+        long delta = now - lastUpdateTime;
+        lastUpdateTime = now;
+
+        // Update order timers
+        orderManager.update(delta);
+
+        // Update dirty plate timers    
+        for (PlateStorage ps : plateStorages) {
+            ps.update(delta);
+        }
+
         if(gameState == titleState){
             updateTitleState();
         }
@@ -255,6 +290,11 @@ public class GamePanel extends JPanel implements Runnable{
             // DRAW TILES
             tileM.draw(g2);
 
+            // DRAW trash stations (optional overlay)
+            for (TrashStation ts : trashStations) {
+                ts.draw(g2, this);
+            }
+
             // DRAW cooking stations (pan at station)
             for (CookingStation cs : cookingStations) {
                 cs.drawAtStation(g2, this);
@@ -291,33 +331,55 @@ public class GamePanel extends JPanel implements Runnable{
             String holdingText = "Holding: " + (players[acivePlayerIndex].heldItem == null ? "None" : players[acivePlayerIndex].heldItem);
             drawText(g2, holdingText, 10, 70, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
 
+            // draw orders UI bottom-left
+            drawOrdersUI(g2);
+
         }
         // --- DRAW GAME OVER SCREEN ---
         else if (gameState == gameOverState) {
             // Lapisan hitam transparan
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.fillRect(0, 0, screenWidth, screenHeight);
-            
-            // Teks Game Over
-            String endText = "STAGE OVER!";
-            Font endFont = new Font("Arial", Font.BOLD, 60);
-            g2.setFont(endFont);
-            g2.setColor(Color.RED);
-            
-            // Hitung posisi tengah
-            int x = getXforCenteredText(g2, endText);
-            int y = screenHeight / 2;
-            
-            g2.drawString(endText, x, y);
-            
-            // Teks "Time's Up!!!"
-            String reasonText = "TIME'S UP!!!";
-            Font reasonFont = new Font("Arial", Font.PLAIN, 30);
-            g2.setFont(reasonFont);
-            g2.setColor(Color.WHITE);
-            x = getXforCenteredText(g2, reasonText);
-            g2.drawString(reasonText, x, y + 50);
+    g2.setColor(new Color(0, 0, 0, 150));
+    g2.fillRect(0, 0, screenWidth, screenHeight);
 
+    // Teks Game Over (besar)
+    String endText = "STAGE OVER!";
+    Font endFont = new Font("Arial", Font.BOLD, 60);
+    g2.setFont(endFont);
+    g2.setColor(Color.RED);
+    int endX = getXforCenteredText(g2, endText);
+    int endY = screenHeight / 2 - 60; // sedikit ke atas dari tengah
+    g2.drawString(endText, endX, endY);
+
+    // Teks alasan / subjudul
+    String reasonText = "TIME'S UP!!!";
+    Font reasonFont = new Font("Arial", Font.PLAIN, 30);
+    g2.setFont(reasonFont);
+    g2.setColor(Color.WHITE);
+    int reasonX = getXforCenteredText(g2, reasonText);
+    int reasonY = endY + 50;
+    g2.drawString(reasonText, reasonX, reasonY);
+
+    // --- Statistik akhir ---
+    // Hitung posisi vertikal dasar untuk menampilkan statistik
+    int statsBaseY = reasonY + 60;
+    g2.setFont(new Font("Arial", Font.PLAIN, 28));
+    g2.setColor(Color.WHITE);
+
+    // Total score
+    String scoreText = "Total Score: " + score;
+    int scoreX = getXforCenteredText(g2, scoreText);
+    g2.drawString(scoreText, scoreX, statsBaseY);
+
+    // Orders completed
+    String completedText = "Orders Completed: " + ordersCompleted;
+    int completedX = getXforCenteredText(g2, completedText);
+    g2.setFont(new Font("Arial", Font.PLAIN, 22));
+    g2.drawString(completedText, completedX, statsBaseY + 40);
+
+    // Orders failed
+    String failedText = "Orders Failed: " + ordersFailed;
+    int failedX = getXforCenteredText(g2, failedText);
+    g2.drawString(failedText, failedX, statsBaseY + 70);
         }
         else if (gameState == instructionState){
             drawInstructionScreen(g2);
@@ -397,4 +459,21 @@ public class GamePanel extends JPanel implements Runnable{
         g2.setColor(Color.YELLOW);
         drawText(g2, "Tekan ENTER untuk kembali ke Main Menu...", getXforCenteredText(g2, "Tekan ENTER untuk kembali ke Main Menu..."), y, g2.getFont(), g2.getColor());
     }
+
+    public void drawOrdersUI(Graphics2D g2) {
+        int startX = 10;
+        int startY = screenHeight - 10;
+        g2.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 14));
+        g2.setColor(java.awt.Color.WHITE);
+        int gap = 18;
+        int drawn = 0;
+        for (int i = 0; i < orderManager.activeOrders.size() && drawn < 3; i++) {
+            Order o = orderManager.activeOrders.get(i);
+            String text = "[" + o.position + "] " + o.recipeName + " (" + o.getRemainingSeconds() + "s)";
+            g2.drawString(text, startX, startY - (drawn * gap));
+            drawn++;
+        }
+    }
+    
+    
 }

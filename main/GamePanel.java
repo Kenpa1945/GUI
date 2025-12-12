@@ -275,6 +275,8 @@ public class GamePanel extends JPanel implements Runnable{
         // Load map stage & rebuild stations
         tileM.loadMap(stage.mapPath);
         rebuildStationsFromMap();
+        floorItem = new String[maxScreenCol][maxScreenRow];
+        floorItemImage = new java.awt.image.BufferedImage[maxScreenCol][maxScreenRow];
 
         // Reset timer stage
         startTime = System.currentTimeMillis();
@@ -464,6 +466,7 @@ public class GamePanel extends JPanel implements Runnable{
 
             // DRAW trash stations
             // DRAW floor items (items dropped on floor)
+        if (floorItem != null && floorItemImage != null) {
             for (int col = 0; col < maxScreenCol; col++) {
                 for (int row = 0; row < maxScreenRow; row++) {
                     String key = floorItem[col][row];
@@ -472,23 +475,25 @@ public class GamePanel extends JPanel implements Runnable{
                         if (img != null) {
                             int x = col * tileSize;
                             int y = row * tileSize;
-                            // draw item centered on tile at smaller size
-                            int w = tileSize/2;
-                            int h = tileSize/2;
-                            int ix = x + (tileSize - w)/2;
-                            int iy = y + (tileSize - h)/2;
+                            int w = tileSize / 2;
+                            int h = tileSize / 2;
+                            int ix = x + (tileSize - w) / 2;
+                            int iy = y + (tileSize - h) / 2;
                             g2.drawImage(img, ix, iy, w, h, null);
                         } else {
-                            // fallback: draw text
-                            g2.setColor(java.awt.Color.WHITE);
-                            g2.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
-                            int x = col * tileSize + 8;
-                            int y = row * tileSize + tileSize/2;
-                            g2.drawString(key, x, y);
+                            g2.setColor(Color.WHITE);
+                            g2.setFont(new Font("Arial", Font.PLAIN, 12));
+                            g2.drawString(
+                                key,
+                                col * tileSize + 8,
+                                row * tileSize + tileSize / 2
+                            );
                         }
                     }
                 }
             }
+        }
+
 
 
             // DRAW trash stations (optional overlay)

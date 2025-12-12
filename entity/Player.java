@@ -194,8 +194,16 @@ public class Player extends Entity{
         // 4) Storage (ingredients)
         // ----------------- REPLACE THE WHOLE if (keyH.ePressed) { ... } BLOCK WITH THIS -----------------
 if (keyH.ePressed) {
+    if (gp.floorItem == null || gp.floorItemImage == null) {
+        keyH.ePressed = false;
+        return;
+    }
     // compute front tile once
     int[] coord = getFrontTileCoord(); // returns [col,row] or null
+    if (coord == null) {
+        keyH.ePressed = false;
+        return;
+    }
     int fc = (coord != null) ? coord[0] : -1;
     int fr = (coord != null) ? coord[1] : -1;
     String floorKey = (coord != null) ? gp.floorItem[fc][fr] : null;

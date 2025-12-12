@@ -16,6 +16,7 @@ import main.CookingStation;
 import main.PlateStorage;
 import main.ServingStation;
 import main.TrashStation;
+import main.WashingStation;
 import main.AssemblyStation;
 
 public class Player extends Entity{
@@ -40,6 +41,10 @@ public class Player extends Entity{
     public int cutCounter = 0;
     public int CUT_DURATION_SECONDS = 3;
     public int CUT_DURATION_FRAMES = 0;
+
+    // jumlah piring kotor yang dipegang (jika player.heldItem == "dirty_plate")
+    public int dirtyPlateCount = 0;
+
 
     public Player(GamePanel gp, KeyHandler keyH, String color){
         this.gp = gp;
@@ -196,6 +201,14 @@ public class Player extends Entity{
                 }
             }           
 
+            // check washing station first
+            int wsIndex = getAdjacentWashingStationIndex();
+            if (wsIndex != -1) {
+                WashingStation ws = gp.washingStations.get(wsIndex);
+                int myIndex = getMyPlayerIndex();
+                boolean acted = ws.interact(myIndex, this);
+                if (acted) { keyH.ePressed = false; return; }
+            }
 
             // 1) PlateStorage
             int psIndex = getAdjacentPlateStorageIndex();
@@ -493,6 +506,22 @@ private boolean tryFetchCookedMeatToPlateNearby() {
             }
         }
 
+        // draw dirty plates on player (if player holds dirty_plate)
+        else if ("dirty_plate".equals(heldItem)) {
+            if (PlateStorage.imgDirtyPlate != null) {
+                int iconW = gp.tileSize/2;
+                int iconH = gp.tileSize/2;
+                int iconX = x + (gp.tileSize - iconW)/2;
+                int iconY = y - iconH - 4;
+                g2.drawImage(PlateStorage.imgDirtyPlate, iconX, iconY, iconW, iconH, null);
+
+        // draw count
+                g2.setColor(java.awt.Color.WHITE);
+                g2.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+                g2.drawString("x"+dirtyPlateCount, iconX + iconW - 18, iconY + 10);
+    }
+}
+
         // draw interaction bars (pick, cut) same as previous implementations
         if (isInteracting) {
             double ratio = (double)interactCounter / (double)INTERACT_DURATION;
@@ -525,17 +554,17 @@ private boolean tryFetchCookedMeatToPlateNearby() {
     }
 
     private int getAdjacentTrashStationIndex() {
-    int centerX = x + solidArea.x + solidArea.width/2;
-    int centerY = y + solidArea.y + solidArea.height/2;
-    int col = centerX / gp.tileSize;
-    int row = centerY / gp.tileSize;
-    for (int i = 0; i < gp.trashStations.size(); i++) {
-        TrashStation ts = gp.trashStations.get(i);
-        if (ts.col == col && ts.row == row) return i;
-        if (ts.col == col && ts.row == row - 1) return i;
-        if (ts.col == col && ts.row == row + 1) return i;
-        if (ts.col == col - 1 && ts.row == row) return i;
-        if (ts.col == col + 1 && ts.row == row) return i;
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
+        for (int i = 0; i < gp.trashStations.size(); i++) {
+            TrashStation ts = gp.trashStations.get(i);
+            if (ts.col == col && ts.row == row) return i;
+            if (ts.col == col && ts.row == row - 1) return i;
+            if (ts.col == col && ts.row == row + 1) return i;
+            if (ts.col == col - 1 && ts.row == row) return i;
+            if (ts.col == col + 1 && ts.row == row) return i;
         }
         return -1;
     }
@@ -555,5 +584,22 @@ private boolean tryFetchCookedMeatToPlateNearby() {
         }
         return -1;
     }    
+
+    private int getAdjacentWashingStationIndex() {
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
+        for (int i = 0; i < gp.washingStations.size(); i++) {
+            WashingStation ws = gp.washingStations.get(i);
+            if (ws.col == col && ws.row == row) return i;
+            if (ws.col == col && ws.row == row - 1) return i;
+            if (ws.col == col && ws.row == row + 1) return i;
+            if (ws.col == col - 1 && ws.row == row) return i;
+            if (ws.col == col + 1 && ws.row == row) return i;
+        }
+        return -1;
+    }
+
 
 }

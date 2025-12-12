@@ -53,15 +53,32 @@ public class PlateStorage {
 
     // Interact: if player empty hand and cleanCount>0 -> give player a clean plate
     // return true if acted
-    public boolean interact(Player player) {
-        if (player.heldItem != null) return false; // must be empty to pick
-        if (cleanCount <= 0) return false;
+    // Interact: if player empty hand and cleanCount>0 -> give player a clean plate
+// Also: if player empty hand and dirtyCount>0 -> give player all dirty plates (stack)
+public boolean interact(Player player) {
+    if (player.heldItem != null) return false; // must be empty to pick
+
+    // If there are dirty plates, player picks ALL dirty plates first (priority)
+    if (dirtyCount > 0) {
+        player.heldItem = "dirty_plate";
+        player.heldItemImage = imgDirtyPlate;
+        player.dirtyPlateCount = dirtyCount; // take all
+        dirtyCount = 0;
+        return true;
+    }
+
+    // Otherwise give a clean plate if available
+    if (cleanCount > 0) {
         player.heldItem = "plate";
         player.heldItemImage = imgCleanPlate;
         player.plateStack.clear();
         cleanCount--;
         return true;
     }
+
+    return false;
+}
+
 
     // schedule a dirty plate to be added after seconds secs
     public void scheduleDirtyPlate(int seconds) {

@@ -69,6 +69,7 @@ public class GamePanel extends JPanel implements Runnable{
     public java.util.ArrayList<PlateStorage> plateStorages = new java.util.ArrayList<>();
     public java.util.ArrayList<AssemblyStation> assemblyStations = new java.util.ArrayList<>();
     public java.util.ArrayList<TrashStation> trashStations = new java.util.ArrayList<>();
+    public java.util.ArrayList<WashingStation> washingStations = new java.util.ArrayList<>();
 
 
     // Collision
@@ -118,8 +119,23 @@ public class GamePanel extends JPanel implements Runnable{
                 else if (t == 5){
                     servingStations.add(new ServingStation(this, col, row));
                 }
+                else if (t == 6){
+                    washingStations.add(new WashingStation(this, col, row));
+                }
             }
         }
+
+        // pair neighboring washing stations horizontally (left=washer, right=output)
+        for (WashingStation ws : washingStations) {
+            for (WashingStation ws2 : washingStations) {
+                if (ws != ws2 && ws.row == ws2.row && ws2.col == ws.col + 1) {
+                    // ws left, ws2 right
+                    ws.isWasher = true;
+                    ws2.isWasher = false;
+                    ws.linkedOutput = ws2;
+        }
+    }
+}
         // Order manager
         orderManager = new OrderManager(this);
         orderManager.trySpawnInitial();
@@ -234,6 +250,9 @@ public class GamePanel extends JPanel implements Runnable{
             ps.update(delta);
         }
 
+        for (WashingStation ws : washingStations) ws.update(delta);
+
+
         if(gameState == titleState){
             updateTitleState();
         }
@@ -305,6 +324,9 @@ public class GamePanel extends JPanel implements Runnable{
 
             // DRAW assembly stations
             for (AssemblyStation a : assemblyStations) a.draw(g2, this);
+
+            // Washing
+            for (WashingStation ws : washingStations) ws.draw(g2, this);
 
             // DRAW PLAYERS (players should draw carried pans above head)
             for(int i = 0; i < players.length; i++){

@@ -34,8 +34,8 @@ public class CookingStation {
         this.x = col * gp.tileSize;
         this.y = row * gp.tileSize;
 
-        COOKED_FRAMES = 12 * gp.FPS; // 12 seconds
-        BURN_FRAMES = 24 * gp.FPS;   // 24 seconds
+        COOKED_FRAMES = 120 * gp.FPS; // 12 seconds
+        BURN_FRAMES = 240 * gp.FPS;   // 24 seconds
 
         loadImages();
     }

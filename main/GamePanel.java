@@ -1,16 +1,14 @@
 package main;
 
+import entity.Player;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Font;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-
 import javax.swing.JPanel;
-
-import entity.Player;
 import tile.TileManager;
 
 // Game Screen
@@ -37,12 +35,20 @@ public class GamePanel extends JPanel implements Runnable{
     public final int playState = 1;
     public final int gameOverState = 2;
     public final int instructionState = 3; // State baru untuk How to Play
+    public final int stageSelectState = 4;
+    public final int stagePreviewState = 5;
+    public final int resultState = 6;
+    public int selectedStage = 1;
+    public StageConfig stageConfig;
+    
+
 
     // Menu State
     public int commandNum = 0; // 0: Start Game, 1: How to Play, 2: Exit
 
+
     // Timer
-    private final int GAME_DURATION_SECONDS = 1 * 60; // 3 menit
+    // private final int GAME_DURATION_SECONDS = 1 * 60; // 3 menit
     private long startTime;
     public long remainingTimeMillis;
     public long lastUpdateTime;
@@ -77,7 +83,13 @@ public class GamePanel extends JPanel implements Runnable{
 
     //Player
     public Player[] players = new Player[2];
-    public int acivePlayerIndex = 0;
+    public int activePlayerIndex  = 0;
+
+    // Stage system
+    public StageManager stageManager = new StageManager();
+    public StageMeta currentStage = null;
+    public int selectedStageIndex = 0;
+
 
     // Cooking stations list
     public ArrayList<CookingStation> cookingStations = new ArrayList<>();
@@ -95,10 +107,11 @@ public class GamePanel extends JPanel implements Runnable{
         players[1].x = 386;
         players[1].y = 239;
 
-        gameState = titleState; 
+        gameState = stageSelectState;
         startTime = System.currentTimeMillis(); 
         lastUpdateTime = System.currentTimeMillis();
-        remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
+        remainingTimeMillis = 0L; // belum ada stage yang berjalan
+
 
         // create cooking stations by scanning map tiles (tile number 3)
         for (int col = 0; col < maxScreenCol; col++) {
@@ -137,8 +150,7 @@ public class GamePanel extends JPanel implements Runnable{
     }
 }
         // Order manager
-        orderManager = new OrderManager(this);
-        orderManager.trySpawnInitial();
+
     }
 
     public void startGameThread(){
@@ -209,7 +221,7 @@ public class GamePanel extends JPanel implements Runnable{
                 
                 // Reset Timer
                 startTime = System.currentTimeMillis(); 
-                remainingTimeMillis = (long)GAME_DURATION_SECONDS * 1000;
+                remainingTimeMillis = stageConfig.gameDurationSeconds * 1000L;
 
                 // Reset cooking stations: place frying pans back and clear items
                 for (CookingStation cs : cookingStations) {
@@ -236,14 +248,133 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
 
+    public void updateStageSelect() {
+        if (keyH.upPressed) {
+            selectedStageIndex--;
+            if (selectedStageIndex < 0) 
+                selectedStageIndex = stageManager.stages.size() - 1;
+            keyH.upPressed = false;
+        }
+
+        if (keyH.downPressed) {
+            selectedStageIndex++;
+            if (selectedStageIndex >= stageManager.stages.size()) 
+                selectedStageIndex = 0;
+            keyH.downPressed = false;
+        }
+
+        if (keyH.enterPressed) {
+            StageMeta s = stageManager.stages.get(selectedStageIndex);
+            if (s.isUnlocked) {
+                currentStage = s;
+                gameState = stagePreviewState;
+            }
+            keyH.enterPressed = false;
+        }
+
+        if (keyH.switchPressed) {
+            gameState = titleState;
+            keyH.switchPressed = false;
+        }
+    }
+
+    public void updateStagePreview() {
+        if (keyH.enterPressed) {
+            startStage(currentStage);
+            keyH.enterPressed = false;
+        }
+
+        if (keyH.switchPressed) {
+            gameState = stageSelectState;
+            keyH.switchPressed = false;
+        }
+    }
+
+    public void updateResultState() {
+        if (keyH.enterPressed) {
+            gameState = stageSelectState;
+            keyH.enterPressed = false;
+        }
+
+        if (keyH.switchPressed) {
+            startStage(currentStage);
+            keyH.switchPressed = false;
+        }
+    }
+
+    public void startStage(StageMeta stage) {
+        // Apply stage config
+        stageConfig = StageConfig.forStage(selectedStage);
+        orderManager = new OrderManager(this);
+        players[0].setDefaultValues();
+        players[1].setDefaultValues();
+        players[1].x = 386;
+        players[1].y = 239;
+
+        score = 0;
+        ordersCompleted = 0;
+        ordersFailed = 0;
+
+        tileM.loadMap(stage.mapPath);
+        rebuildStationsFromMap();
+
+        startTime = System.currentTimeMillis();
+        remainingTimeMillis = stageConfig.gameDurationSeconds * 1000L;
+
+        orderManager.activeOrders.clear();
+        orderManager.resetSequence();
+        orderManager.trySpawnInitial();
+
+        gameState = playState;
+    }
+
+    public void rebuildStationsFromMap() {
+        cookingStations.clear();
+        assemblyStations.clear();
+        trashStations.clear();
+        plateStorages.clear();
+        washingStations.clear();
+        servingStations.clear();
+
+        for (int col = 0; col < maxScreenCol; col++) {
+            for (int row = 0; row < maxScreenRow; row++) {
+
+                int t = tileM.mapTileNum[col][row];
+
+                if (t == 3) cookingStations.add(new CookingStation(this, col, row));
+                else if (t == 4) assemblyStations.add(new AssemblyStation(this, col, row));
+                else if (t == 8) plateStorages.add(new PlateStorage(this, col, row, 5));
+                else if (t == 9) trashStations.add(new TrashStation(this, col, row));
+                else if (t == 5) servingStations.add(new ServingStation(this, col, row));
+                else if (t == 6) washingStations.add(new WashingStation(this, col, row));
+            }
+        }
+
+        for (WashingStation ws : washingStations) {
+            for (WashingStation ws2 : washingStations) {
+                if (ws != ws2 && ws.row == ws2.row && ws2.col == ws.col + 1) {
+                    ws.isWasher = true;
+                    ws2.isWasher = false;
+                    ws.linkedOutput = ws2;
+                }
+            }
+        }
+    }
+
+
+
+
     public void update(){
         // === DELTA TIME CALCULATION ===
         long now = System.currentTimeMillis();
         long delta = now - lastUpdateTime;
         lastUpdateTime = now;
 
-        // Update order timers
-        orderManager.update(delta);
+        // Update order timers (hanya kalau sudah ada stage yang dimulai)
+        if (orderManager != null) {
+            orderManager.update(delta);
+        }
+
 
         // Update dirty plate timers    
         for (PlateStorage ps : plateStorages) {
@@ -252,6 +383,20 @@ public class GamePanel extends JPanel implements Runnable{
 
         for (WashingStation ws : washingStations) ws.update(delta);
 
+        if (gameState == stageSelectState) {
+            updateStageSelect();
+            return;
+        }
+
+        if (gameState == stagePreviewState) {
+            updateStagePreview();
+            return;
+        }
+
+        if (gameState == resultState) {
+            updateResultState();
+            return;
+        }
 
         if(gameState == titleState){
             updateTitleState();
@@ -260,17 +405,25 @@ public class GamePanel extends JPanel implements Runnable{
             
             // --- Cek Timer ---
             long elapsedTime = System.currentTimeMillis() - startTime;
-            remainingTimeMillis = ((long)GAME_DURATION_SECONDS * 1000) - elapsedTime;
+            remainingTimeMillis = (stageConfig.gameDurationSeconds * 1000L) - elapsedTime;
+
 
             if (remainingTimeMillis <= 0) {
-                remainingTimeMillis = 0; // Pastikan tidak negatif
-                gameState = gameOverState; // Pindah ke state Game Over
-                System.out.println("Time's Up!!!"); // Output konsol untuk testing
+                remainingTimeMillis = 0;
+
+                boolean pass = score >= currentStage.targetScore;
+
+                if (pass) {
+                    currentStage.isCleared = true;
+                    int idx = stageManager.stages.indexOf(currentStage);
+                    stageManager.unlockNext(idx);
+                }
+
+                gameState = resultState;
             }
-            // --- End Cek Timer ---
 
             if(keyH.switchPressed == true){
-                acivePlayerIndex = (acivePlayerIndex + 1) % players.length;
+                activePlayerIndex  = (activePlayerIndex  + 1) % players.length;
                 keyH.switchPressed = false;
             }
 
@@ -303,6 +456,22 @@ public class GamePanel extends JPanel implements Runnable{
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
         
+
+        if (gameState == stageSelectState) {
+            drawStageSelectScreen(g2);
+            return;
+        }
+
+        if (gameState == stagePreviewState) {
+            drawStagePreviewScreen(g2);
+            return;
+        }
+
+        if (gameState == resultState) {
+            drawResultScreen(g2);
+            return;
+        }
+
         if (gameState == titleState) {
             drawTitleScreen(g2);
         } else if (gameState == playState) {
@@ -349,8 +518,8 @@ public class GamePanel extends JPanel implements Runnable{
             String timeText = dFormat.format(minutes) + ":" + dFormat.format(seconds);
 
             drawText(g2, "Time: " + timeText, 10, 20, new Font("Arial", Font.BOLD, 20), Color.WHITE);
-            drawText(g2, "Player Aktif: " + (acivePlayerIndex == 0 ? "Merah" : "Biru"), 10, 45, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
-            String holdingText = "Holding: " + (players[acivePlayerIndex].heldItem == null ? "None" : players[acivePlayerIndex].heldItem);
+            drawText(g2, "Player Aktif: " + (activePlayerIndex  == 0 ? "Merah" : "Biru"), 10, 45, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
+            String holdingText = "Holding: " + (players[activePlayerIndex].heldItem == null ? "None" : players[activePlayerIndex].heldItem);
             drawText(g2, holdingText, 10, 70, new Font("Arial", Font.PLAIN, 16), Color.WHITE);
 
             // draw orders UI bottom-left
@@ -503,6 +672,78 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
     
+    public void drawStageSelectScreen(Graphics2D g2) {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 36));
+        g2.setColor(Color.WHITE);
+        g2.drawString("Stage Select", 240, 60);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 24));
+
+        int y = 140;
+
+        for (int i = 0; i < stageManager.stages.size(); i++) {
+
+            StageMeta s = stageManager.stages.get(i);
+
+            if (i == selectedStageIndex) g2.setColor(Color.YELLOW);
+            else if (!s.isUnlocked) g2.setColor(Color.GRAY);
+            else if (s.isCleared) g2.setColor(Color.GREEN);
+            else g2.setColor(Color.WHITE);
+
+            g2.drawString(s.name + "  (Target: " + s.targetScore + ")", 80, y);
+            y += 40;
+        }
+
+        g2.setFont(new Font("Arial", Font.ITALIC, 18));
+        g2.setColor(Color.LIGHT_GRAY);
+        g2.drawString("ENTER: Preview | SPACE: Back", 200, screenHeight - 40);
+    }
+
+    public void drawStagePreviewScreen(Graphics2D g2) {
+        g2.setColor(new Color(20,20,20));
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 32));
+        g2.setColor(Color.WHITE);
+        g2.drawString("Preview: " + currentStage.name, 140, 60);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 24));
+        g2.drawString("Target Score: " + currentStage.targetScore, 200, 120);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 20));
+        g2.setColor(Color.LIGHT_GRAY);
+        g2.drawString("ENTER: Start | SPACE: Back", 200, screenHeight - 50);
+
+        tileM.draw(g2);
+    }
+
+    public void drawResultScreen(Graphics2D g2) {
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+
+        boolean pass = score >= currentStage.targetScore;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 48));
+        g2.setColor(pass ? Color.GREEN : Color.RED);
+        g2.drawString(pass ? "STAGE CLEARED!" : "STAGE FAILED!", 140, 120);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 28));
+        g2.setColor(Color.WHITE);
+        g2.drawString("Score: " + score, 220, 190);
+        g2.drawString("Target: " + currentStage.targetScore, 220, 230);
+        g2.drawString("Orders Success: " + ordersCompleted, 220, 270);
+        g2.drawString("Orders Failed: " + ordersFailed, 220, 310);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 20));
+        g2.setColor(Color.YELLOW);
+        g2.drawString("ENTER: Back to Stage Select", 180, 380);
+        g2.drawString("SPACE: Replay Stage", 220, 410);
+    }
+
+
     
     
 }

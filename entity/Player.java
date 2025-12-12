@@ -1,23 +1,20 @@
 package entity;
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
-
 import javax.imageio.ImageIO;
-
-import java.awt.Color;
-
+import main.AssemblyStation;
+import main.CookingStation;
 import main.GamePanel;
 import main.KeyHandler;
-import main.CookingStation;
 import main.PlateStorage;
 import main.ServingStation;
 import main.TrashStation;
 import main.WashingStation;
-import main.AssemblyStation;
 
 public class Player extends Entity{
     GamePanel gp;
@@ -112,7 +109,7 @@ public class Player extends Entity{
     public void update(){
         if (gp.gameState != gp.playState) return;
 
-        boolean isActive = (this == gp.players[gp.acivePlayerIndex]);
+        boolean isActive = (this == gp.players[gp.activePlayerIndex]);
 
         // advance picking
         if (isInteracting) {
@@ -287,7 +284,7 @@ public class Player extends Entity{
         if (isMoving) {
             collisionOn = false;
             gp.cChecker.checkTile(this);
-            gp.cChecker.checkPlayer(this, gp.players, gp.acivePlayerIndex);
+            gp.cChecker.checkPlayer(this, gp.players, gp.activePlayerIndex);
             if (!collisionOn) {
                 switch(direction) {
                     case "up": y -= speed; if (y <= goalY) { y = goalY; isMoving = false; } break;

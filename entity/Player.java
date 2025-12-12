@@ -10,6 +10,7 @@ import javax.imageio.ImageIO;
 import main.AssemblyStation;
 import main.CookingStation;
 import main.GamePanel;
+import main.IngredientStation;
 import main.KeyHandler;
 import main.PlateStorage;
 import main.ServingStation;
@@ -48,7 +49,7 @@ public class Player extends Entity{
     // cutting fields
     public boolean isCutting = false;
     public int cutCounter = 0;
-    public int CUT_DURATION_SECONDS = 3;
+    public int CUT_DURATION_SECONDS = 18;
     public int CUT_DURATION_FRAMES = 0;
 
     // jumlah piring kotor yang dipegang (jika player.heldItem == "dirty_plate")
@@ -293,6 +294,21 @@ if (keyH.ePressed) {
         if (acted) { keyH.ePressed = false; return; }
     }
 
+    // 5.5) INGREDIENT STATION (OBJECT, BUKAN TILE)
+    int centerX = x + solidArea.x + solidArea.width / 2;
+    int centerY = y + solidArea.y + solidArea.height / 2;
+    int col = centerX / gp.tileSize;
+    int row = centerY / gp.tileSize;
+
+    for (IngredientStation is : gp.ingredientStations) {
+        if (Math.abs(is.col - col) + Math.abs(is.row - row) <= 1) {
+            if (is.interact(this)) {
+                keyH.ePressed = false;
+                return;
+            }
+        }
+    }
+
     // 6) Assembly Station (with special: transfer cooked_meat nearby to plate if empty)
     int asIndex = getAdjacentAssemblyStationIndex();
     if (asIndex != -1) {
@@ -321,21 +337,6 @@ if (keyH.ePressed) {
             cs.panTimer = 0;
             keyH.ePressed = false;
             return;
-        }
-    }
-
-    // 8) Ingredient storage (only if player empty hand)
-    if (this.heldItem == null) {
-        int storageTileNum = getAdjacentStorageTile();
-        if (storageTileNum != -1) {
-            pendingItem = tileNumToItemName(storageTileNum);
-            pendingItemImage = tileNumToImage(storageTileNum);
-            if (pendingItem != null && pendingItemImage != null) {
-                isInteracting = true;
-                interactCounter = 0;
-                keyH.ePressed = false;
-                return;
-            }
         }
     } else {
         // holding something -> can't start storage pickup; consume input to avoid repeats

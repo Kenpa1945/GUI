@@ -95,6 +95,8 @@ public class GamePanel extends JPanel implements Runnable{
 
     // Cooking stations list
     public ArrayList<CookingStation> cookingStations = new ArrayList<>();
+    //Ingredient stations list
+    public ArrayList<IngredientStation> ingredientStations = new ArrayList<>();
 
     public GamePanel(){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
@@ -310,6 +312,8 @@ public class GamePanel extends JPanel implements Runnable{
         plateStorages.clear();
         washingStations.clear();
         servingStations.clear();
+        ingredientStations.clear();
+
 
         for (int col = 0; col < maxScreenCol; col++) {
             for (int row = 0; row < maxScreenRow; row++) {
@@ -322,6 +326,21 @@ public class GamePanel extends JPanel implements Runnable{
                 else if (t == 9) trashStations.add(new TrashStation(this, col, row));
                 else if (t == 5) servingStations.add(new ServingStation(this, col, row));
                 else if (t == 6) washingStations.add(new WashingStation(this, col, row));
+                if (t == 7) ingredientStations.add(
+                    new IngredientStation(this, col, row, "bun", "/res/ingredient/bun.png")
+                );
+                else if (t == 10) ingredientStations.add(
+                    new IngredientStation(this, col, row, "meat", "/res/ingredient/meat.png")
+                );
+                else if (t == 11) ingredientStations.add(
+                    new IngredientStation(this, col, row, "cheese", "/res/ingredient/cheese.png")
+                );
+                else if (t == 12) ingredientStations.add(
+                    new IngredientStation(this, col, row, "lettuce", "/res/ingredient/lettuce.png")
+                );
+                else if (t == 13) ingredientStations.add(
+                    new IngredientStation(this, col, row, "tomato", "/res/ingredient/tomato.png")
+                );
             }
         }
 
@@ -464,36 +483,40 @@ public class GamePanel extends JPanel implements Runnable{
             // DRAW TILES
             tileM.draw(g2);
 
-            // DRAW trash stations
             // DRAW floor items (items dropped on floor)
-        if (floorItem != null && floorItemImage != null) {
-            for (int col = 0; col < maxScreenCol; col++) {
-                for (int row = 0; row < maxScreenRow; row++) {
-                    String key = floorItem[col][row];
-                    if (key != null) {
-                        java.awt.image.BufferedImage img = floorItemImage[col][row];
-                        if (img != null) {
-                            int x = col * tileSize;
-                            int y = row * tileSize;
-                            int w = tileSize / 2;
-                            int h = tileSize / 2;
-                            int ix = x + (tileSize - w) / 2;
-                            int iy = y + (tileSize - h) / 2;
-                            g2.drawImage(img, ix, iy, w, h, null);
-                        } else {
-                            g2.setColor(Color.WHITE);
-                            g2.setFont(new Font("Arial", Font.PLAIN, 12));
-                            g2.drawString(
-                                key,
-                                col * tileSize + 8,
-                                row * tileSize + tileSize / 2
-                            );
+            if (floorItem != null && floorItemImage != null) {
+                for (int col = 0; col < maxScreenCol; col++) {
+                    for (int row = 0; row < maxScreenRow; row++) {
+                        String key = floorItem[col][row];
+                        if (key != null) {
+                            java.awt.image.BufferedImage img = floorItemImage[col][row];
+                            if (img != null) {
+                                int x = col * tileSize;
+                                int y = row * tileSize;
+                                int w = tileSize / 2;
+                                int h = tileSize / 2;
+                                int ix = x + (tileSize - w) / 2;
+                                int iy = y + (tileSize - h) / 2;
+                                g2.drawImage(img, ix, iy, w, h, null);
+                            } else {
+                                g2.setColor(Color.WHITE);
+                                g2.setFont(new Font("Arial", Font.PLAIN, 12));
+                                g2.drawString(
+                                    key,
+                                    col * tileSize + 8,
+                                    row * tileSize + tileSize / 2
+                                );
+                            }
                         }
                     }
                 }
             }
-        }
 
+
+            // DRAW INGREDIENT STATIONS (WAJIB DI SINI)
+            for (IngredientStation is : ingredientStations) {
+                is.draw(g2, this);
+            }
 
 
             // DRAW trash stations (optional overlay)
@@ -610,11 +633,19 @@ public class GamePanel extends JPanel implements Runnable{
 
         drawText(g2, "Kontrol Pemain:", marginX, y, g2.getFont(), g2.getColor());
         y += tileSize * 0.7;
-        drawText(g2, "- Gerak: W (Atas), A (Kiri), S (Bawah), D (Kanan)", marginX, y, g2.getFont(), g2.getColor());
+        drawText(g2, "- Movement: W (Atas), A (Kiri), S (Bawah), D (Kanan)", marginX, y, g2.getFont(), g2.getColor());
         y += tileSize * 0.7;
         drawText(g2, "- Switch Player: SPACE", marginX, y, g2.getFont(), g2.getColor());
         y += tileSize * 0.7;
         drawText(g2, "- Interaksi: E (ambil/taruh bahan / cooking station)", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "- Interaksi: P (memotong bahan / cutting station)", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "- Interaksi: Q (drop/jatuhkan bahan)", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "", marginX, y, g2.getFont(), g2.getColor());
+        y += tileSize * 0.7;
+        drawText(g2, "Selesaikan semua order sesuai dengan waktunya!", marginX, y, g2.getFont(), g2.getColor());
 
         y += tileSize * 2;
         g2.setColor(Color.YELLOW);

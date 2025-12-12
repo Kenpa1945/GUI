@@ -110,6 +110,9 @@ public class GamePanel extends JPanel implements Runnable{
 
         players[1].x = 386;
         players[1].y = 239;
+        
+        players[0].syncPxPyToXY();
+        players[1].syncPxPyToXY();
 
         // Stage/title flow versi baru
         gameState = titleState;

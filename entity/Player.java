@@ -79,8 +79,14 @@ public class Player extends Entity{
         CUT_DURATION_FRAMES = CUT_DURATION_SECONDS * gp.FPS;
     }
 
+    public void syncPxPyToXY() {
+        this.px = this.x;
+        this.py = this.y;
+    }
+
     public void setDefaultValues(){
         x = 290; y = 95; speed = 1; direction = "down";
+        syncPxPyToXY();
 
         heldItem = null;
         heldItemImage = null;
@@ -124,6 +130,9 @@ public class Player extends Entity{
     }
 
     public void update(){
+        px += (x - px) * 0.30;
+        py += (y - py) * 0.30;
+        
         if (gp.gameState != gp.playState) return;
 
         boolean isActive = (this == gp.players[gp.activePlayerIndex]);
@@ -151,7 +160,10 @@ public class Player extends Entity{
             }
         }
 
-        if (!isActive) return;
+        if (!isActive) {
+            return; // stop input, stop interaction
+        }
+
 
         // handle P for cutting toggle (if holding cuttable)
         if (keyH.pPressed) {
@@ -348,6 +360,7 @@ if (keyH.ePressed) {
 
         // movement input
         if (!isMoving) {
+            syncPxPyToXY();
             if (keyH.upPressed) { direction = "up"; isMoving = true; goalX = x; goalY = y - gp.tileSize; }
             else if (keyH.downPressed) { direction = "down"; isMoving = true; goalX = x; goalY = y + gp.tileSize; }
             else if (keyH.leftPressed) { direction = "left"; isMoving = true; goalX = x - gp.tileSize; goalY = y; }
@@ -361,15 +374,38 @@ if (keyH.ePressed) {
             collisionOn = false;
             gp.cChecker.checkTile(this);
             gp.cChecker.checkPlayer(this, gp.players, gp.activePlayerIndex);
+
             if (!collisionOn) {
                 switch(direction) {
-                    case "up": y -= speed; if (y <= goalY) { y = goalY; isMoving = false; } break;
-                    case "down": y += speed; if (y >= goalY) { y = goalY; isMoving = false; } break;
-                    case "left": x -= speed; if (x <= goalX) { x = goalX; isMoving = false; } break;
-                    case "right": x += speed; if (x >= goalX) { x = goalX; isMoving = false; } break;
+                    case "up":
+                        py -= MOVE_SPEED;
+                        if (py <= goalY) { py = goalY; isMoving = false; }
+                        break;
+                    case "down":
+                        py += MOVE_SPEED;
+                        if (py >= goalY) { py = goalY; isMoving = false; }
+                        break;
+                    case "left":
+                        px -= MOVE_SPEED;
+                        if (px <= goalX) { px = goalX; isMoving = false; }
+                        break;
+                    case "right":
+                        px += MOVE_SPEED;
+                        if (px >= goalX) { px = goalX; isMoving = false; }
+                        break;
                 }
-            } else { isMoving = false; }
+
+                // sinkronkan ke int untuk semua sistem yang butuh int (tile, collision, adjacency)
+                x = (int)Math.round(px);
+                y = (int)Math.round(py);
+
+            } else {
+                // batal gerak: kunci ulang posisi presisi ke posisi int saat ini
+                syncPxPyToXY();
+                isMoving = false;
+            }
         }
+
     }
 
     // Try to fetch cooked_meat from any adjacent cooking station into player's plate
@@ -531,7 +567,10 @@ private boolean tryFetchCookedMeatToPlateNearby() {
             case "left": image = (spriteNum==1?left1:left2); break;
             case "right": image = (spriteNum==1?right1:right2); break;
         }
-        g2.drawImage(image, x, y, gp.tileSize, gp.tileSize, null);
+        int drawX = (int)Math.round(px);
+        int drawY = (int)Math.round(py);
+        g2.drawImage(image, drawX, drawY, gp.tileSize, gp.tileSize, null);
+
 
         // draw held item (if not a plate; if plate, we draw plate contents separately)
         if (heldItem != null && !"plate".equals(heldItem)) {

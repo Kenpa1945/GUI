@@ -1,11 +1,7 @@
 package main;
 
-import java.awt.Graphics2D;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import entity.Player;
+import java.awt.Graphics2D;
 
 public class ServingStation {
     public int col, row;
@@ -54,7 +50,8 @@ public class ServingStation {
             gp.orderManager.completeOrderAtIndex(matchedIndex);
     
             // schedule dirty plate to nearest plate storage (I use index 0; change if you want nearest)
-            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).scheduleDirtyPlate(10);
+            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).dirtyCount++;
+;
     
             // consume player's plate
             player.plateStack.clear();
@@ -73,7 +70,8 @@ public class ServingStation {
             }
     
             // schedule dirty plate
-            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).scheduleDirtyPlate(10);
+            if (!gp.plateStorages.isEmpty()) gp.plateStorages.get(0).dirtyCount++;
+;
     
             // consume player's plate
             player.plateStack.clear();
@@ -86,4 +84,6 @@ public class ServingStation {
     public void draw(Graphics2D g2, GamePanel gp) {
         // optional overlay (tile already drawn by TileManager)
     }
+
+    
 }

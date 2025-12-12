@@ -5,7 +5,10 @@ import java.awt.image.BufferedImage;
 
 public class Entity {
     public int x,y;
+    public double px;
+    public double py;
     public int speed;
+    public double MOVE_SPEED = 0.45;
     public BufferedImage up1, up2, down1, down2, left1, left2, right1, right2;
     public Rectangle solidArea;
     public boolean collisionOn = false;

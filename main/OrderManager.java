@@ -11,6 +11,7 @@ public class OrderManager {
     public ArrayList<Order> activeOrders = new ArrayList<>();
     private int nextOrderPosition = 1;
     private Random rnd = new Random();
+    int stageId;
 
     // recipes definitions (name -> required items)
     // Note: requiredItems MUST match item keys used everywhere (e.g. "bun","cooked_meat","chopped_cheese"...)
@@ -18,6 +19,7 @@ public class OrderManager {
 
     public OrderManager(GamePanel gp) {
         this.gp = gp;
+        int stageId = gp.stageConfig.stageId;
 
         // Ambil multiplier difficulty dari StageConfig (kalau belum ada, pakai 1.0)
         double r = (gp.stageConfig != null) ? gp.stageConfig.rewardMultiplier  : 1.0;
@@ -25,49 +27,73 @@ public class OrderManager {
 
         recipePrototypes = new ArrayList<>();
 
-        // Base value
-        int baseRewardClassic   = 120;
-        int basePenaltyClassic  = -50;
-        int baseRewardCheese    = 150;
-        int basePenaltyCheese   = -60;
-        int baseRewardBLT       = 170;
-        int basePenaltyBLT      = -70;
-        int baseRewardDeluxe    = 200;
-        int basePenaltyDeluxe   = -80;
+        if (stageId == 1) {
+            addRecipeWeighted("Classic Burger", 5, r, p);
+            addRecipeWeighted("Cheeseburger",   4, r, p);
+            addRecipeWeighted("BLT Burger",     1, r, p);
+            addRecipeWeighted("Deluxe Burger",  1, r, p);
+        }
+        else if (stageId == 2) {
+            addRecipeWeighted("Classic Burger", 3, r, p);
+            addRecipeWeighted("Cheeseburger",   3, r, p);
+            addRecipeWeighted("BLT Burger",     2, r, p);
+            addRecipeWeighted("Deluxe Burger",  2, r, p);
+        }
+        else if (stageId == 3) {
+            addRecipeWeighted("Classic Burger", 2, r, p);
+            addRecipeWeighted("Cheeseburger",   2, r, p);
+            addRecipeWeighted("BLT Burger",     4, r, p);
+            addRecipeWeighted("Deluxe Burger",  4, r, p);
+        }
+    }
 
-        // Pakai multiplier stage untuk reward & penalty
-        recipePrototypes.add(new Order(
-                0,
-                "Classic Burger",
-                Arrays.asList("bun","cooked_meat"),
-                (int)Math.round(baseRewardClassic * r),
-                (int)Math.round(basePenaltyClassic * p),
-                45
-        ));
-        recipePrototypes.add(new Order(
-                0,
-                "Cheeseburger",
-                Arrays.asList("bun","cooked_meat","chopped_cheese"),
-                (int)Math.round(baseRewardCheese * r),
-                (int)Math.round(basePenaltyCheese * p),
-                50
-        ));
-        recipePrototypes.add(new Order(
-                0,
-                "BLT Burger",
-                Arrays.asList("bun","chopped_lettuce","chopped_tomato","cooked_meat"),
-                (int)Math.round(baseRewardBLT * r),
-                (int)Math.round(basePenaltyBLT * p),
-                55
-        ));
-        recipePrototypes.add(new Order(
-                0,
-                "Deluxe Burger",
-                Arrays.asList("bun","chopped_lettuce","cooked_meat","chopped_cheese"),
-                (int)Math.round(baseRewardDeluxe * r),
-                (int)Math.round(basePenaltyDeluxe * p),
-                60
-        ));
+    private void addRecipeWeighted(String name, int weight, double r, double p) {
+
+        List<String> req;
+        int reward, penalty, time;
+
+        // matching resep berdasarkan implementasi Anda
+        switch (name) {
+            case "Classic Burger" -> {
+                req = Arrays.asList("bun","cooked_meat");
+                reward = (int)Math.round(120 * r);
+                penalty = (int)Math.round(-50 * p);
+                time = 45;
+            }
+            case "Cheeseburger" -> {
+                req = Arrays.asList("bun","cooked_meat","chopped_cheese");
+                reward = (int)Math.round(150 * r);
+                penalty = (int)Math.round(-60 * p);
+                time = 50;
+            }
+            case "BLT Burger" -> {
+                req = Arrays.asList("bun","chopped_lettuce","chopped_tomato","cooked_meat");
+                reward = (int)Math.round(170 * r);
+                penalty = (int)Math.round(-70 * p);
+                time = 55;
+            }
+            case "Deluxe Burger" -> {
+                req = Arrays.asList("bun","chopped_lettuce","cooked_meat","chopped_cheese");
+                reward = (int)Math.round(200 * r);
+                penalty = (int)Math.round(-80 * p);
+                time = 60;
+            }
+            default -> {
+                return;
+            }
+        }
+
+        // duplikasi resep sesuai weight
+        for (int i = 0; i < weight; i++) {
+            recipePrototypes.add(new Order(
+                    0,
+                    name,
+                    req,
+                    reward,
+                    penalty,
+                    time
+            ));
+        }
     }
 
     public void resetSequence() {

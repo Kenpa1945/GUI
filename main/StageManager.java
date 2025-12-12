@@ -12,10 +12,10 @@ public class StageManager {
         s1.isUnlocked = true;
 
         // Stage 2 – Burger medium
-        StageMeta s2 = new StageMeta("Burger Stage 2", "/res/maps/map02.txt", 450);
+        StageMeta s2 = new StageMeta("Burger Stage 2", "/res/maps/map01.txt", 450);
 
-        // Stage 3 – Sushi (contoh)
-        StageMeta s3 = new StageMeta("Sushi Stage 1", "/res/maps/map03.txt", 600);
+        // Stage 3 – Burger hard
+        StageMeta s3 = new StageMeta("Burger Stage 3", "/res/maps/map01.txt", 600);
 
         stages.add(s1);
         stages.add(s2);

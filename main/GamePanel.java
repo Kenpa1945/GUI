@@ -107,7 +107,8 @@ public class GamePanel extends JPanel implements Runnable{
         players[1].x = 386;
         players[1].y = 239;
 
-        gameState = stageSelectState;
+        gameState = titleState;     // BUKAN stageSelect
+        stageConfig = null;         // akan dibuat di startStage()
         startTime = System.currentTimeMillis(); 
         lastUpdateTime = System.currentTimeMillis();
         remainingTimeMillis = 0L; // belum ada stage yang berjalan
@@ -196,50 +197,31 @@ public class GamePanel extends JPanel implements Runnable{
     
 
     public void updateTitleState() {
-        if(keyH.upPressed){
+        if (keyH.upPressed) {
             commandNum--;
-            if(commandNum < 0){
-                commandNum = 2; // Loop ke "Exit"
-            }
+            if (commandNum < 0) commandNum = 2;
             keyH.upPressed = false;
         }
-        if(keyH.downPressed){
+        if (keyH.downPressed) {
             commandNum++;
-            if(commandNum > 2){
-                commandNum = 0; // Loop ke "Start Game"
-            }
+            if (commandNum > 2) commandNum = 0;
             keyH.downPressed = false;
-        } 
-        
-        if(keyH.enterPressed){
-            if(commandNum == 0){ // Start Game
-                // Reset/setup ulang nilai game sebelum mulai
-                players[0].setDefaultValues(); 
-                players[1].setDefaultValues();
-                players[1].x = 386; // Posisi Blue Player 
-                players[1].y = 239;
-                
-                // Reset Timer
-                startTime = System.currentTimeMillis(); 
-                remainingTimeMillis = stageConfig.gameDurationSeconds * 1000L;
+        }
 
-                // Reset cooking stations: place frying pans back and clear items
-                for (CookingStation cs : cookingStations) {
-                    cs.panPresent = true;
-                    cs.panOwner = -1;
-                    cs.panItem = null;
-                    cs.panTimer = 0;
-                }
-
-                gameState = playState;
-            } else if (commandNum == 1){ // How to Play
+        if (keyH.enterPressed) {
+            if (commandNum == 0) {  // START GAME → masuk Stage Select
+                gameState = stageSelectState;
+            }
+            else if (commandNum == 1) { // HOW TO PLAY
                 gameState = instructionState;
-            } else if (commandNum == 2){ // Exit
+            }
+            else if (commandNum == 2) { // EXIT
                 System.exit(0);
             }
             keyH.enterPressed = false;
         }
     }
+
 
     public void updateInstructionState() {
         if(keyH.enterPressed){
@@ -304,7 +286,7 @@ public class GamePanel extends JPanel implements Runnable{
 
     public void startStage(StageMeta stage) {
         // Apply stage config
-        stageConfig = StageConfig.forStage(selectedStage);
+        stageConfig = StageConfig.forStage(selectedStageIndex + 1);
         orderManager = new OrderManager(this);
         players[0].setDefaultValues();
         players[1].setDefaultValues();
@@ -364,39 +346,34 @@ public class GamePanel extends JPanel implements Runnable{
 
 
 
-    public void update(){
-        // === DELTA TIME CALCULATION ===
+    public void update() {
+
         long now = System.currentTimeMillis();
         long delta = now - lastUpdateTime;
         lastUpdateTime = now;
 
-        // Update order timers (hanya kalau sudah ada stage yang dimulai)
-        if (orderManager != null) {
-            orderManager.update(delta);
+        // Update UI states (mereka tidak boleh menyentuh timer / stageConfig)
+        if (gameState == titleState) {
+            updateTitleState();
+            return;
         }
-
-
-        // Update dirty plate timers    
-        for (PlateStorage ps : plateStorages) {
-            ps.update(delta);
+        if (gameState == instructionState) {
+            updateInstructionState();
+            return;
         }
-
-        for (WashingStation ws : washingStations) ws.update(delta);
-
         if (gameState == stageSelectState) {
             updateStageSelect();
             return;
         }
-
         if (gameState == stagePreviewState) {
             updateStagePreview();
             return;
         }
-
         if (gameState == resultState) {
             updateResultState();
             return;
         }
+
 
         if(gameState == titleState){
             updateTitleState();

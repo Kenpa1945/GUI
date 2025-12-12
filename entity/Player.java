@@ -26,6 +26,18 @@ public class Player extends Entity{
     BufferedImage imgChoppedMeat, imgChoppedCheese, imgChoppedLettuce, imgChoppedTomato;
     // fryingpan image might be handled in CookingStation
 
+    // === image cache untuk item (letakkan di field area Player) ===
+    private static java.util.Map<String, java.awt.image.BufferedImage> ITEM_IMAGE_CACHE = new java.util.HashMap<>();
+
+    private static java.awt.image.BufferedImage loadItemImage(String path) {
+        try {
+            return javax.imageio.ImageIO.read(Player.class.getResourceAsStream(path));
+        } catch (Exception e) {
+            // file missing -> return null silently
+            return null;
+        }
+    }
+
     // plate contents when player holds a plate
     public ArrayList<String> plateStack;
 
@@ -41,6 +53,10 @@ public class Player extends Entity{
 
     // jumlah piring kotor yang dipegang (jika player.heldItem == "dirty_plate")
     public int dirtyPlateCount = 0;
+
+    // Debounce untuk tombol drop (Q) — track apakah Q sudah diproses / sedang ditekan di frame sebelumnya
+    private boolean prevQPressed = false;
+
 
 
     public Player(GamePanel gp, KeyHandler keyH, String color){
@@ -144,131 +160,182 @@ public class Player extends Entity{
             keyH.pPressed = false;
         }
 
+        // handle drop key Q
+        if (keyH.qPressed) {
+            boolean acted = false;
+            // priority: if player has fryingpan with content, drop content first
+            acted = tryDropPanContentToFront();
+            if (!acted) {
+                // else if player holds ingredient, drop it
+                acted = tryDropToFront();
+            }
+            
+            // *** PERBAIKAN DITEMPATKAN DI SINI ***
+            // Konsumsi input Q, terlepas dari apakah aksi berhasil.
+            // Ini mencegah penekanan yang gagal memicu aksi di frame berikutnya.
+            keyH.qPressed = false;
+            
+            // Jika aksi berhasil, kita bisa menghentikan frame ini untuk mencegah
+            // tindakan lain yang mungkin terjadi dalam fungsi update() yang sama.
+            if (acted) {
+                return; // exit update so no immediate other actions this frame
+            }
+            
+            // Jika tidak acted, kita telah mengkonsumsi input dan update() berlanjut
+        }
+
+        // at very end of update (or after input handling) remember to update prevQPressed:
+
+
         // Handle E interactions with priority order:
         // 1) PlateStorage (if adjacent and player empty -> pick plate)
         // 2) AssemblyStation (complex behaviors & special cooked_meat fetch)
         // 3) CookingStation (existing behavior)
         // 4) Storage (ingredients)
-        if (keyH.ePressed) {
+        // ----------------- REPLACE THE WHOLE if (keyH.ePressed) { ... } BLOCK WITH THIS -----------------
+if (keyH.ePressed) {
+    // compute front tile once
+    int[] coord = getFrontTileCoord(); // returns [col,row] or null
+    int fc = (coord != null) ? coord[0] : -1;
+    int fr = (coord != null) ? coord[1] : -1;
+    String floorKey = (coord != null) ? gp.floorItem[fc][fr] : null;
 
-            if ("plate".equals(this.heldItem)) {
-                int centerX = x + solidArea.x + solidArea.width/2;
-                int centerY = y + solidArea.y + solidArea.height/2;
-                int col = centerX / gp.tileSize;
-                int row = centerY / gp.tileSize;
-        
-                // loop semua cooking station dan cek adjacency manhattan <=1
-                for (CookingStation cs : gp.cookingStations) {
-                    if (Math.abs(cs.col - col) + Math.abs(cs.row - row) <= 1) {
-                        if (cs.panAtStation() && "cooked_meat".equals(cs.panItem)) {
-                            // transfer cooked_meat to player's plate
-                            this.plateStack.add("cooked_meat");
-                            // remove it from the frying pan and reset timer
-                            cs.panItem = null;
-                            cs.panTimer = 0;
-                            // consume input and stop further interaction processing
-                            keyH.ePressed = false;
-                            return; // important: stop here so no other interact logic runs this frame
-                        }
-                    }
-                }
-            }
+    // allowed items to stack on a plate
+    java.util.List<String> ALLOWED_ON_PLATE = java.util.Arrays.asList(
+        "bun", "chopped_cheese", "chopped_lettuce", "chopped_tomato", "cooked_meat"
+    );
 
-            // --- SERVING STATION (prioritas tinggi) ---
-            int svIndex = getAdjacentServingStationIndex();
-            if (svIndex != -1) {
-                ServingStation sv = gp.servingStations.get(svIndex);
-                boolean acted = sv.interact(this);
-            if (acted) {
-                keyH.ePressed = false;
-                return; // consumed
-                }
-            }
+    // 0) If player holds a plate -> try pick floor->plate (highest priority)
+    if ("plate".equals(this.heldItem) && floorKey != null) {
+        if (ALLOWED_ON_PLATE.contains(floorKey)) {
+            this.plateStack.add(floorKey);
+            gp.floorItem[fc][fr] = null;
+            gp.floorItemImage[fc][fr] = null;
+            keyH.ePressed = false;
+            return;
+        }
+        // if floor item exists but not allowed on plate, continue to other interactions
+    }
 
-            
+    // 0.1) If player holds a plate and adjacent to a cooking station with cooked_meat -> take from pan
+    if ("plate".equals(this.heldItem)) {
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
 
-            // 0) Trash station interaction (highest priority)
-            int tsIndex = getAdjacentTrashStationIndex();
-            if (tsIndex != -1) {
-                TrashStation ts = gp.trashStations.get(tsIndex);
-                boolean acted = ts.interact(this);
-                if (acted) {
-                    keyH.ePressed = false;
-                    return; // consume the input and stop other interactions for this frame
-                }
-            }           
-
-            // check washing station first
-            int wsIndex = getAdjacentWashingStationIndex();
-            if (wsIndex != -1) {
-                WashingStation ws = gp.washingStations.get(wsIndex);
-                int myIndex = getMyPlayerIndex();
-                boolean acted = ws.interact(myIndex, this);
-                if (acted) { keyH.ePressed = false; return; }
-            }
-
-            // 1) PlateStorage
-            int psIndex = getAdjacentPlateStorageIndex();
-            if (psIndex != -1) {
-                PlateStorage ps = gp.plateStorages.get(psIndex);
-                boolean acted = ps.interact(this);
-                if (acted) { keyH.ePressed = false; return; }
-            }
-
-            // 2) AssemblyStation
-            int asIndex = getAdjacentAssemblyStationIndex();
-            if (asIndex != -1) {
-                AssemblyStation as = gp.assemblyStations.get(asIndex);
-
-                // Special: if player holds plate and assembly empty AND there is adjacent cooking station with cooked_meat,
-                // transfer cooked_meat from that cooking station directly to player's plate.
-                if ("plate".equals(this.heldItem) && as.plateStack == null && as.singleItem == null) {
-                    boolean fetched = tryFetchCookedMeatToPlateNearby();
-                    if (fetched) { keyH.ePressed = false; return; }
-                }
-
-                boolean acted = as.interact(this);
-                if (acted) { keyH.ePressed = false; return; }
-            }
-
-            // 3) CookingStation (fallback existing behavior)
-            int csIndex = getAdjacentCookingStationIndex();
-            if (csIndex != -1) {
-                CookingStation cs = gp.cookingStations.get(csIndex);
-                int myIndex = getMyPlayerIndex();
-                if (myIndex != -1) {
-                    boolean acted = cs.interact(myIndex, this);
-                    if (acted) { keyH.ePressed = false; return; }
-                }
-                else if ("plate".equals(this.heldItem) && cs.panAtStation() && "cooked_meat".equals(cs.panItem)){
-                    // transfer cooked meat to player's plate
+        for (CookingStation cs : gp.cookingStations) {
+            if (Math.abs(cs.col - col) + Math.abs(cs.row - row) <= 1) {
+                if (cs.panAtStation() && "cooked_meat".equals(cs.panItem)) {
                     this.plateStack.add("cooked_meat");
-                    // clear pan content and reset timer
                     cs.panItem = null;
                     cs.panTimer = 0;
-                    keyH.ePressed = false; // consume input
+                    keyH.ePressed = false;
                     return;
                 }
             }
+        }
+    }
 
-            // 4) Ingredient storage
-            if (this.heldItem == null) {
-                int storageTileNum = getAdjacentStorageTile();
-                if (storageTileNum != -1) {
-                    pendingItem = tileNumToItemName(storageTileNum);
-                    pendingItemImage = tileNumToImage(storageTileNum);
-                    if (pendingItem != null && pendingItemImage != null) {
-                        isInteracting = true;
-                        interactCounter = 0;
-                        keyH.ePressed = false;
-                        return;
-                    }
-                }
-            } else {
-                // holding something -> can't pick another
+    // 1) If player empty handed -> try pick floor->hand
+    if (this.heldItem == null && floorKey != null) {
+        // pick up any floor item (ingredients or dirty_plate)
+        this.heldItem = floorKey;
+        this.heldItemImage = mapItemToImageForDraw(floorKey);
+        if ("dirty_plate".equals(floorKey)) {
+            // if floor supports count, adjust; here assume 1
+            this.dirtyPlateCount = 1;
+        }
+        gp.floorItem[fc][fr] = null;
+        gp.floorItemImage[fc][fr] = null;
+        keyH.ePressed = false;
+        return;
+    }
+
+    // 2) Washing Station (allow washer to accept dirty plates or start washing)
+    int wsIndex = getAdjacentWashingStationIndex();
+    if (wsIndex != -1) {
+        WashingStation ws = gp.washingStations.get(wsIndex);
+        int myIndex = getMyPlayerIndex();
+        boolean acted = ws.interact(myIndex, this);
+        if (acted) { keyH.ePressed = false; return; }
+    }
+
+    // 3) Serving Station
+    int svIndex = getAdjacentServingStationIndex();
+    if (svIndex != -1) {
+        ServingStation sv = gp.servingStations.get(svIndex);
+        boolean acted = sv.interact(this);
+        if (acted) { keyH.ePressed = false; return; }
+    }
+
+    // 4) Trash station
+    int tsIndex = getAdjacentTrashStationIndex();
+    if (tsIndex != -1) {
+        TrashStation ts = gp.trashStations.get(tsIndex);
+        boolean acted = ts.interact(this);
+        if (acted) { keyH.ePressed = false; return; }
+    }
+
+    // 5) Plate Storage
+    int psIndex = getAdjacentPlateStorageIndex();
+    if (psIndex != -1) {
+        PlateStorage ps = gp.plateStorages.get(psIndex);
+        boolean acted = ps.interact(this);
+        if (acted) { keyH.ePressed = false; return; }
+    }
+
+    // 6) Assembly Station (with special: transfer cooked_meat nearby to plate if empty)
+    int asIndex = getAdjacentAssemblyStationIndex();
+    if (asIndex != -1) {
+        AssemblyStation as = gp.assemblyStations.get(asIndex);
+
+        if ("plate".equals(this.heldItem) && as.plateStack == null && as.singleItem == null) {
+            boolean fetched = tryFetchCookedMeatToPlateNearby();
+            if (fetched) { keyH.ePressed = false; return; }
+        }
+
+        boolean acted = as.interact(this);
+        if (acted) { keyH.ePressed = false; return; }
+    }
+
+    // 7) Cooking Station (interact / pick cooked meat if pan at station and player holds plate)
+    int csIndex = getAdjacentCookingStationIndex();
+    if (csIndex != -1) {
+        CookingStation cs = gp.cookingStations.get(csIndex);
+        int myIndex = getMyPlayerIndex();
+        if (myIndex != -1) {
+            boolean acted = cs.interact(myIndex, this);
+            if (acted) { keyH.ePressed = false; return; }
+        } else if ("plate".equals(this.heldItem) && cs.panAtStation() && "cooked_meat".equals(cs.panItem)) {
+            this.plateStack.add("cooked_meat");
+            cs.panItem = null;
+            cs.panTimer = 0;
+            keyH.ePressed = false;
+            return;
+        }
+    }
+
+    // 8) Ingredient storage (only if player empty hand)
+    if (this.heldItem == null) {
+        int storageTileNum = getAdjacentStorageTile();
+        if (storageTileNum != -1) {
+            pendingItem = tileNumToItemName(storageTileNum);
+            pendingItemImage = tileNumToImage(storageTileNum);
+            if (pendingItem != null && pendingItemImage != null) {
+                isInteracting = true;
+                interactCounter = 0;
                 keyH.ePressed = false;
+                return;
             }
         }
+    } else {
+        // holding something -> can't start storage pickup; consume input to avoid repeats
+        keyH.ePressed = false;
+    }
+}
+// ----------------- END REPLACEMENT BLOCK -----------------
+
 
         // movement input
         if (!isMoving) {
@@ -538,16 +605,33 @@ private boolean tryFetchCookedMeatToPlateNearby() {
         }
     }
 
-    private BufferedImage mapItemToImageForDraw(String key) {
+    private java.awt.image.BufferedImage mapItemToImageForDraw(String key) {
         if (key == null) return null;
-        switch(key) {
-            case "bun": return imgBun;
-            case "chopped_cheese": return imgChoppedCheese;
-            case "chopped_lettuce": return imgChoppedLettuce;
-            case "chopped_tomato": return imgChoppedTomato;
-            case "cooked_meat": return CookingStation.imgCookedMeat;
-            default: return null;
+        if (ITEM_IMAGE_CACHE.containsKey(key)) return ITEM_IMAGE_CACHE.get(key);
+    
+        java.awt.image.BufferedImage img = null;
+        switch (key) {
+            case "bun": img = loadItemImage("/res/ingredient/bun.png"); break;
+            case "meat": img = loadItemImage("/res/ingredient/meat.png"); break;
+            case "chopped_meat": img = loadItemImage("/res/ingredient/chopped_meat.png"); break;
+            case "chopped_cheese": img = loadItemImage("/res/ingredient/chopped_cheese.png"); break;
+            case "chopped_lettuce": img = loadItemImage("/res/ingredient/chopped_lettuce.png"); break;
+            case "chopped_tomato": img = loadItemImage("/res/ingredient/chopped_tomato.png"); break;
+            case "cooked_meat": img = loadItemImage("/res/ingredient/cooked_meat.png"); break;
+            case "burned_meat": img = loadItemImage("/res/ingredient/burned_meat.png"); break;
+            case "cheese": img = loadItemImage("/res/ingredient/cheese.png"); break;
+            case "lettuce": img = loadItemImage("/res/ingredient/lettuce.png"); break;
+            case "tomato": img = loadItemImage("/res/ingredient/tomato.png"); break;
+            case "clean_plate": img = loadItemImage("/res/ingredient/clean_plate.png"); break;
+            case "dirty_plate": img = loadItemImage("/res/ingredient/dirty_plate.png"); break;
+            default:
+                // try generic path: /res/ingredient/<key>.png
+                img = loadItemImage("/res/ingredient/" + key + ".png");
+                break;
         }
+    
+        ITEM_IMAGE_CACHE.put(key, img); // may be null if missing
+        return img;
     }
 
     private int getAdjacentTrashStationIndex() {
@@ -597,6 +681,77 @@ private boolean tryFetchCookedMeatToPlateNearby() {
         }
         return -1;
     }
+
+    // returns [col,row] of tile in front of player (one tile ahead), or null if out of bounds
+    private int[] getFrontTileCoord() {
+        int centerX = x + solidArea.x + solidArea.width/2;
+        int centerY = y + solidArea.y + solidArea.height/2;
+        int col = centerX / gp.tileSize;
+        int row = centerY / gp.tileSize;
+        switch (direction) {
+            case "up": row = row - 1; break;
+            case "down": row = row + 1; break;
+            case "left": col = col - 1; break;
+            case "right": col = col + 1; break;
+        }
+        if (col < 0 || col >= gp.maxScreenCol || row < 0 || row >= gp.maxScreenRow) return null;
+        return new int[]{col, row};
+    }
+
+    // attempt to drop currently held ingredient to front tile
+    // returns true if drop happened
+    private boolean tryDropToFront() {
+        if (heldItem == null) return false;
+        if (heldItem.equals("plate") || heldItem.equals("fryingpan") || heldItem.equals("dirty_plate")) return false;
+    
+        int[] coord = getFrontTileCoord();
+        if (coord == null) return false;
+        int col = coord[0], row = coord[1];
+    
+        int tileNum = gp.tileM.mapTileNum[col][row];
+        if (tileNum != 0) return false;
+        if (gp.floorItem[col][row] != null) return false;
+    
+        // Drop ingredient from player's hand to floor
+        gp.floorItem[col][row] = heldItem;
+        gp.floorItemImage[col][row] = mapItemToImageForDraw(heldItem); // <-- set image here
+        // clear player's held item
+        heldItem = null;
+        heldItemImage = null;
+        return true;
+    }
+
+    // If player is carrying a fryingpan (panOwner), drop the pan's item to the front tile (if allowed)
+    private boolean tryDropPanContentToFront() {
+        // find CookingStation whose panOwner is this player
+        int myIdx = getMyPlayerIndex();
+        if (myIdx == -1) return false;
+        CookingStation ownerCS = null;
+        for (CookingStation cs : gp.cookingStations) {
+            if (cs.panOwner == myIdx) { ownerCS = cs; break; }
+        }
+        if (ownerCS == null) return false;
+        if (ownerCS.panItem == null) return false; // nothing to drop
+
+        // check front tile
+        int[] coord = getFrontTileCoord();
+        if (coord == null) return false;
+        int col = coord[0], row = coord[1];
+        int tileNum = gp.tileM.mapTileNum[col][row];
+        if (tileNum != 0) return false;
+        if (gp.floorItem[col][row] != null) return false;
+
+        // drop panItem to floor
+        String itemToDrop = ownerCS.panItem;
+        ownerCS.panItem = null;
+        ownerCS.panTimer = 0;
+        gp.floorItem[col][row] = itemToDrop;
+        gp.floorItemImage[col][row] = mapItemToImageForDraw(itemToDrop);
+        return true;
+    }
+
+    
+
 
 
 }

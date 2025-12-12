@@ -7,7 +7,8 @@ import java.awt.event.KeyListener;
 public class KeyHandler implements KeyListener{
 
     public boolean upPressed, leftPressed,
-                   rightPressed, downPressed, switchPressed, enterPressed;
+                   rightPressed, downPressed, switchPressed, 
+                   enterPressed, qPressed;
     public boolean ePressed = false; // E untuk mengambil bahan (existing)
     public boolean pPressed = false; // P untuk cutting
 
@@ -44,6 +45,9 @@ public class KeyHandler implements KeyListener{
         if(code == KeyEvent.VK_P){ // Tambahkan tombol P (cutting)
             pPressed = true;
         }
+        if(code == KeyEvent.VK_Q){
+            qPressed = true;
+        }
 
     }
 
@@ -75,6 +79,9 @@ public class KeyHandler implements KeyListener{
         }
         if(code == KeyEvent.VK_P){
             pPressed = false;
+        }
+        if(code == KeyEvent.VK_Q){
+            qPressed = true;
         }
     }
 }
